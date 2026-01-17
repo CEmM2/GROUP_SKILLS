@@ -5,9 +5,9 @@ Use this checklist to systematically review code. Not all items apply to every P
 ## 1. Correctness (The Prime Directive)
 - [ ] **Physical Laws**: Does the code respect conservation laws (mass, momentum, energy)?
 - [ ] **Sign Conventions**:
-    - [ ] Voigt order: `[xx, yy, zz, xy, xz, yz]`?
-    - [ ] Pressure: Compression positive? (`p = -mean(σ)`)
-    - [ ] Stress: Updates in corotational frame?
+    - [ ] Voigt Order: `[xx, yy, zz, xy, xz, yz]`?
+    - [ ] Pressure: Compression Positive? (`p = -mean(σ)`)
+    - [ ] Stress: Updates in Corotational Frame?
 - [ ] **Invariants**: Are invariants preserved? (e.g., `det(F) > 0` for solids).
 - [ ] **Math**: Are tensor operations correct? (Check against SymPy or reference if complex).
 
