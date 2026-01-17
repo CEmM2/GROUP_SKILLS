@@ -9,7 +9,7 @@ When reviewing new code, ask: "Where does this fit in the testing tiers?"
 *   **Tier A (Pure Math)**: New math utility (e.g., a new tensor operation)?
     *   *Requirement*: Must have a unit test running in standard Python (NumPy/SymPy) checking correctness. Fast execution (<1s).
 *   **Tier B (Kernels)**: New Taichi kernel?
-    *   *Requirement*: Unit test calling the kernel with small, deterministic inputs. verify against reference implementation.
+    *   *Requirement*: Unit test calling the kernel with small, deterministic inputs. Verify against reference implementation.
 *   **Tier C (Integration)**: New physics feature (e.g., plasticity model)?
     *   *Requirement*: Patch test (single element/particle) ensuring stress states are correct.
 *   **Tier D (Performance)**: Optimization?
