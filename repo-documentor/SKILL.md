@@ -1,5 +1,5 @@
 ---
-name: repo-documentator
+name: repo-documentor
 description: Generate repository documentation with architecture/dataflow diagrams, workflows/entrypoints, artifacts & formats registry, units/frames conventions, module inheritance & API contracts, class/function references with math/physics descriptions, validation/verification maps, stability notes, and optional MkDocs/Sphinx/LaTeX outputs.
 ---
 
