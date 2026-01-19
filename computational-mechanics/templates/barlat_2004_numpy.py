@@ -7,7 +7,7 @@ deviator to capture high-fidelity anisotropy in metals (e.g., Aluminum).
 Framework-agnostic pure NumPy implementation for maximum portability.
 
 Reference:
-    Barlat, F., et al. "Linear transfomation-based anisotropic yield functions."
+    Barlat, F., et al. "Linear transformation-based anisotropic yield functions."
     Int. J. Plasticity 21 (2005) 1009-1039.
 
 Voigt Notation Convention:
@@ -56,15 +56,16 @@ def cardano_eigenvalues(s_vec: np.ndarray) -> np.ndarray:
     s_vec = np.atleast_2d(s_vec)
     batch_size = s_vec.shape[0]
 
-    # Reconstruct 3x3 symmetric matrix components
-    s00, s11, s22 = s_vec[:, 0], s_vec[:, 1], s_vec[:, 2]
-    s12, s02, s01 = s_vec[:, 3], s_vec[:, 4], s_vec[:, 5]  # off-diagonal: yz, xz, xy
+    # Reconstruct 3x3 symmetric matrix components from Voigt notation
+    # Voigt: [s11, s22, s33, s23, s13, s12]
+    s11, s22, s33 = s_vec[:, 0], s_vec[:, 1], s_vec[:, 2]
+    s23, s13, s12 = s_vec[:, 3], s_vec[:, 4], s_vec[:, 5]  # off-diagonal: yz, xz, xy
 
     # Invariants of the matrix
-    I1 = s00 + s11 + s22
-    I2 = s00*s11 + s11*s22 + s22*s00 - s01**2 - s02**2 - s12**2
-    I3 = (s00*s11*s22 + 2*s01*s02*s12
-          - s00*s12**2 - s11*s02**2 - s22*s01**2)
+    I1 = s11 + s22 + s33
+    I2 = s11*s22 + s22*s33 + s33*s11 - s12**2 - s13**2 - s23**2
+    I3 = (s11*s22*s33 + 2*s12*s13*s23
+          - s11*s23**2 - s22*s13**2 - s33*s12**2)
 
     # For Cardano's formula: characteristic eq is λ³ - I₁λ² + I₂λ - I₃ = 0
     # Substitute λ = μ + I₁/3 to eliminate quadratic term: μ³ + pμ + q = 0
@@ -78,13 +79,22 @@ def cardano_eigenvalues(s_vec: np.ndarray) -> np.ndarray:
 
     # Handle diagonal case
     if np.any(diagonal_mask):
-        eig[diagonal_mask, 0] = s00[diagonal_mask]
-        eig[diagonal_mask, 1] = s11[diagonal_mask]
-        eig[diagonal_mask, 2] = s22[diagonal_mask]
+        eig[diagonal_mask, 0] = s11[diagonal_mask]
+        eig[diagonal_mask, 1] = s22[diagonal_mask]
+        eig[diagonal_mask, 2] = s33[diagonal_mask]
 
     # Handle non-diagonal case (Cardano's trigonometric solution)
-    non_diag = ~diagonal_mask & (p < 0)
+    # For a deviatoric tensor, p must be non-positive (p <= 0)
+    non_diag = ~diagonal_mask
     if np.any(non_diag):
+        # Assert physical constraint for deviatoric tensors
+        if np.any(p[non_diag] > 1e-9):
+            raise ValueError(
+                f"Positive p found: {np.max(p[non_diag]):.2e}. "
+                "This is unexpected for a deviatoric tensor and may indicate "
+                "non-deviatoric input or numerical precision issues."
+            )
+
         r = np.sqrt(np.abs(p[non_diag]) / 3.0)
 
         # Clamp argument for numerical stability
@@ -98,13 +108,6 @@ def cardano_eigenvalues(s_vec: np.ndarray) -> np.ndarray:
         eig[non_diag, 0] = 2.0 * r * np.cos(theta) + shift
         eig[non_diag, 1] = 2.0 * r * np.cos(theta + 2.0*np.pi/3.0) + shift
         eig[non_diag, 2] = 2.0 * r * np.cos(theta + 4.0*np.pi/3.0) + shift
-
-    # Handle degenerate case (p >= 0, non-diagonal)
-    degenerate = ~diagonal_mask & (p >= 0)
-    if np.any(degenerate):
-        eig[degenerate, 0] = s00[degenerate]
-        eig[degenerate, 1] = s11[degenerate]
-        eig[degenerate, 2] = s22[degenerate]
 
     # Sort descending
     eig = -np.sort(-eig, axis=1)
@@ -153,7 +156,7 @@ def barlat_equivalent_stress(
     lam_prime = np.atleast_2d(lam_prime)
     lam_double_prime = np.atleast_2d(lam_double_prime)
 
-    phi_sum = 0.0
+    phi_sum = np.zeros(stress_voigt.shape[0], dtype=stress_voigt.dtype)
     for i in range(3):
         for j in range(3):
             diff = lam_prime[:, i] - lam_double_prime[:, j]

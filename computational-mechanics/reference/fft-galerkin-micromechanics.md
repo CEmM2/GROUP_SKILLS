@@ -78,12 +78,21 @@ where $\lambda^0$, $\mu^0$ are Lamé constants of reference medium.
 
 ### Acoustic Tensor Form (More General)
 
-$$\hat{G}^0_{km}(\boldsymbol{\xi}) = \left[C^0_{ijkl}\xi_j\xi_l\right]^{-1}_{im}$$
+Define the **acoustic tensor** (second-order):
 
-Then:
-$$\hat{\Gamma}^0_{ijkl}(\boldsymbol{\xi}) = \xi_j\xi_l\hat{G}^0_{ik}(\boldsymbol{\xi})$$
+$$K^0_{im}(\boldsymbol{\xi}) = C^0_{ijkl}\xi_j\xi_l$$
 
-with symmetrization over $ij$ and $kl$.
+Then its inverse:
+
+$$\hat{G}^0_{km}(\boldsymbol{\xi}) = \left[K^0\right]^{-1}_{km}(\boldsymbol{\xi})$$
+
+The **Green's operator** (fourth-order) is constructed as:
+
+$$\hat{\Gamma}^0_{ijkl}(\boldsymbol{\xi}) = \text{Sym}_{(i,j),(k,l)}\left[\xi_k \hat{G}^0_{il}(\boldsymbol{\xi}) \xi_j\right]$$
+
+where $\text{Sym}_{(i,j),(k,l)}$ denotes symmetrization over index pairs $(i,j)$ and $(k,l)$:
+
+$$\text{Sym}_{(i,j),(k,l)}[T_{ijkl}] = \frac{1}{4}(T_{ijkl} + T_{jikl} + T_{ijlk} + T_{jilk})$$
 
 **Note**: This form works for anisotropic reference media.
 

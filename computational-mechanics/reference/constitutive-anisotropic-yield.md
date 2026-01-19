@@ -206,12 +206,12 @@ Set $\mathbf{L}' = \mathbf{L}'' = \mathbf{L}_{iso}$ → should recover von Mises
 
 **Uniaxial tension** ($\sigma_{11} = \sigma_y$, others zero):
 ```
-Expected: Φ ≈ σ_y  (yield function f ≈ 0)
+Expected: σ_eq ≈ σ_y  (yield function Φ = f ≈ 0)
 ```
 
 **Pure shear** ($\tau_{12} = \sigma_y/\sqrt{3}$):
 ```
-Expected: Φ ≈ σ_y  (yield function f ≈ 0)
+Expected: σ_eq ≈ σ_y  (yield function Φ = f ≈ 0)
 ```
 
 ### Directional Yield Strength
@@ -219,8 +219,11 @@ Expected: Φ ≈ σ_y  (yield function f ≈ 0)
 For calibrated anisotropic matrices:
 
 **Test uniaxial stress at angles** θ = 0°, 45°, 90°:
+
+Apply a uniaxial stress of magnitude $\sigma_0$ at angle $\theta$ to the 1-axis in the 1-2 plane. The stress components in Voigt notation are:
 ```
-σ(θ) = [σ₁₁·cos²θ, σ₂₂·sin²θ, 0, 0, 0, σ₁₂·cosθ·sinθ]
+σ(θ) = [σ₀·cos²θ, σ₀·sin²θ, 0, 0, 0, σ₀·sinθ·cosθ]
+       (σ₁₁,     σ₂₂,     σ₃₃, σ₂₃, σ₁₃, σ₁₂)
 
 Compute: σ_eq(θ) / σ_y  (anisotropy ratio)
 ```

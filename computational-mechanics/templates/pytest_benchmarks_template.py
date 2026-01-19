@@ -11,8 +11,9 @@ import numpy as np
 import pytest
 
 # Import canonical benchmark implementations
+# Note: If using these templates outside a package structure, change to absolute import
 try:
-    from validation_benchmarks import (
+    from .validation_benchmarks import (
         TaylorAnvilBenchmark,
         PhaseFieldFractureBenchmark,
         FFTPeriodicRVEBenchmark,

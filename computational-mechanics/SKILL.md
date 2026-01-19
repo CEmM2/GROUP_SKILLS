@@ -57,7 +57,7 @@ g(φ) = (1-φ)² + k                   (k ≈ 1e-6 for stability)
 ```
 Lippmann-Schwinger: ε̃(x) = -Γ⁰ * τ(ε̃)
 Fourier space:      ε̂(ξ) = ε̄ - Γ̂⁰(ξ) : τ̂(ξ)
-Green's operator:   Γ̂⁰ᵢⱼₖₗ(ξ) = (ξⱼξₗ/|ξ|²) [C⁰ᵢⱼₖₗ ξⱼξₗ]⁻¹
+Green's operator:   Γ̂⁰ᵢⱼₖₗ(ξ) = Sym(ξₖ (K⁰)⁻¹ᵢₗ ξⱼ), K⁰ = C⁰ᵢⱼₖₗξⱼξₗ (acoustic tensor)
 ```
 
 ## Progressive disclosure map

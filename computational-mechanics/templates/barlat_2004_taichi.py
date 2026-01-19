@@ -5,7 +5,7 @@ This constitutive model uses two linear transformations of the stress
 deviator to capture high-fidelity anisotropy in metals (e.g., Aluminum).
 
 Reference:
-    Barlat, F., et al. "Linear transfomation-based anisotropic yield functions."
+    Barlat, F., et al. "Linear transformation-based anisotropic yield functions."
     Int. J. Plasticity 21 (2005) 1009-1039.
 """
 
