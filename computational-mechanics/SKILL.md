@@ -1,6 +1,10 @@
 ---
 name: computational-mechanics
-description: Derives and implements nonlinear solid mechanics algorithms: tensor calculus, finite-strain kinematics (Total Lagrangian, convected coordinates), rate- and temperature-dependent plasticity, brittle/ductile fracture (phase-field, GTN), and FFT-Galerkin micromechanics. Use for FEM/FFT constitutive updates, objective stress integration, solver architecture, and verification.
+description: |
+  Derives and implements nonlinear solid mechanics algorithms: tensor calculus, finite-strain kinematics
+  (Total Lagrangian, convected coordinates), rate- and temperature-dependent plasticity, brittle/ductile
+  fracture (phase-field, GTN), and FFT-Galerkin micromechanics. Use for FEM/FFT constitutive updates,
+  objective stress integration, solver architecture, and verification.
 ---
 
 # Computational Mechanics
