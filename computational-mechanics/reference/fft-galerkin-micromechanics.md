@@ -287,7 +287,7 @@ $$\bar{\boldsymbol{\sigma}} : \bar{\boldsymbol{\varepsilon}} = \langle\boldsymbo
 **Be consistent** with FFT normalization:
 
 **NumPy/SciPy convention**:
-```python
+```text
 fft:  F[k] = Σ_n f[n] exp(-2πi kn/N)
 ifft: f[n] = (1/N) Σ_k F[k] exp(2πi kn/N)
 ```

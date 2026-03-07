@@ -101,7 +101,7 @@ Apply BCs in separate kernels to avoid divergence:
 - Dirichlet: mask DOFs and overwrite/update velocity/displacement
 - Neumann/tractions: add to external force vector
 
-(See `references/boundary-conditions.md`.)
+(See also `references/gotchas.md` §13 for GPU-specific BC pitfalls.)
 
 ---
 
@@ -109,7 +109,7 @@ Apply BCs in separate kernels to avoid divergence:
 - Explicit: update `v, u` directly from forces and mass
 - Implicit: CG/PCG inner loop for linear solve, with outer Newton
 
-(See `references/linear-solvers.md` and `references/time-integration.md`.)
+(See `domains/linear-solvers.md` and `domains/time-integration.md`.)
 
 ---
 
