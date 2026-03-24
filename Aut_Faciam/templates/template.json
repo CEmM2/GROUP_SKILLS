@@ -1,0 +1,88 @@
+{
+    "task_id": "",
+    "title": "",
+    "phase": "",
+    "objective": "",
+    "plan_file": "",
+    "plan_lines": [
+        "",
+        ""
+    ],
+    "plan_assets": [
+        {
+            "asset_description": "",
+            "asset_type": "",
+            "Plan_file_start_line": 0,
+            "Plan_file_end_line": 0
+        }
+    ],
+    "blocked_by": [],
+    "blocks": [
+        ""
+    ],
+    "scope": [
+        ""
+    ],
+    "implementation_steps": [
+        "",
+        "",
+        "",
+        "",
+        ""
+    ],
+    "deliverables": [
+        "",
+        "",
+        "",
+        ""
+    ],
+    "acceptance_criteria": [
+        ""
+    ],
+    "verification_commands": [
+        ""
+    ],
+    "test_plan": {
+        "tier": "",
+        "cases": [
+            ""
+        ]
+    },
+    "test_artifacts": [
+        ""
+    ],
+    "risks": [
+        ""
+    ],
+    "status": "",
+    "completion_date": "",
+    "test_completion": {
+        "passed": 0,
+        "total": 0,
+        "pass_rate": 0,
+        "commands": [
+            {
+                "command": "",
+                "passed": 0,
+                "total": 0
+            }
+        ]
+    },
+    "review_score": 0,
+    "review_breakdown": {
+        "minor": 0,
+        "medium": 0,
+        "high": 0,
+        "critical": 0
+    },
+    "review_status": "",
+    "implementation_branch": "",
+    "completion_notes": [
+        ""
+    ],
+    "github_issue": {
+        "phase_issue": null,
+        "task_issue": null,
+        "repo": ""
+    }
+}
