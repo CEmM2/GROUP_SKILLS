@@ -53,7 +53,7 @@ Create `Phase_<phase_id>_Tasks_analysis.md` inside `<tasks_folder>`:
 ## Step 3 — Branch Setup
 
 ```bash
-git checkout -b <plan_name>_phase-<phase_id>
+git checkout -b <plan_slug>_phase-<phase_id>
 ```
 
 Never implement on `main` or `master` without explicit user consent.
@@ -63,7 +63,7 @@ Never implement on `main` or `master` without explicit user consent.
 ## Step 4 — Execution Order
 
 1. **Never execute a task whose blocker has not been marked complete and verified** (evidence of passing tests required — not the subagent's claim alone).
-2. **Parallel first pass:** Identify all tasks where both complexity ≤ 3 AND risk ≤ 3 AND all blockers are satisfied. Dispatch these in parallel — one subagent per task. Each task's `gh issue edit` (label flip to in-progress) can run concurrently — these are independent calls.
+2. **Parallel first pass:** Identify all tasks where both complexity ≤ 3 AND risk ≤ 3 AND all blockers are satisfied. Dispatch these in parallel — one subagent per task, up to 4 concurrent. If more than 4 tasks qualify, process them in batches of 4. Before dispatching a parallel batch, verify that no two tasks in the batch modify the same file (check `deliverables` and `scope` in their JSONs). If file scopes overlap, run those tasks sequentially instead. Each task's `gh issue edit` (label flip to in-progress) can run concurrently — these are independent calls.
 3. **Sequential high-risk tasks:** Tasks where complexity OR risk > 3 are executed one at a time, each in its own commit.
 4. Process remaining tasks in dependency order after the parallel batch completes and is verified.
 
@@ -89,6 +89,8 @@ gh issue edit <task_issue> --remove-label "blocked" --add-label "in-progress"
 
 After each implementer subagent reports completion, run gates A → B → C in sequence. **Do not skip or reorder them.**
 
+GateS A&B pass rule: start from 10; deduct 1 point per minor issue and 2 points per medium issue. Pass only if the score is ≥ 8 and there are no high or critical issues.
+
 **During all gate review loops: no `gh` calls.** All gate attempts are recorded in `gates/phase_<phase_id>_gates.md` only. Use the format from `templates/gate_entry.md`.
 
 ### Gate A — Spec Compliance Review
@@ -101,8 +103,7 @@ Dispatch a spec compliance reviewer subagent using the template at `templates/sp
 
 Only dispatch after Gate A passes.
 
-Review the task implementation for correctness and adherence to the requirements specs and design in `dev/design_docs/`. Provide:
-- The task spec
+Dispatch a domain quality reviewer subagent using the template at `templates/domain_quality_template.md`. **Provide the FULL TASK JSON CONTENT inline.** Also provide:
 - The implementer's report
 - The BASE_SHA (commit before the task) and HEAD_SHA (current commit)
 
@@ -150,17 +151,20 @@ Record completion timestamp in `gates/phase_<phase_id>_gates.md`.
 ### GitHub updates (3-4 `gh` calls):
 
 ```bash
-# 1. Labels + close (2 calls)
+# 1. Labels + close (2 gh calls)
 gh issue edit <task_issue> --remove-label "in-progress" --add-label "done,gate-a-pass,gate-b-pass"
 gh issue close <task_issue>
+```
 
-# 2. Check off in phase issue (1 call)
-# Fetch body, replace "- [ ] #<task_issue>" with "- [x] #<task_issue>", update
-gh issue view <phase_issue> --json body -q .body > /tmp/phase_body.md
-# (do the replacement)
-gh issue edit <phase_issue> --body-file /tmp/phase_body.md
+**2. Check off in phase issue (2 gh calls — follow the canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists):**
 
-# 3. Unblock downstream (1 call per newly-unblocked task)
+1. `Bash`: `gh issue view <phase_issue> --json body -q .body` — capture stdout.
+2. `Write` tool: save captured body to `/tmp/phase_body.md`.
+3. `Edit` tool: `old_string: "- [ ] #<task_issue>"`, `new_string: "- [x] #<task_issue>"`.
+4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_body.md`.
+
+```bash
+# 3. Unblock downstream (1 gh call per newly-unblocked task)
 gh issue edit <downstream_task_issue> --remove-label "blocked"
 ```
 
@@ -180,24 +184,20 @@ When all tasks in the current phase are complete and verified, generate a handof
 
 ### GitHub updates (3 `gh` calls, or 2 if final phase):
 
-1. Edit the next phase's issue body to include the handoff (skip if this is the final phase):
+1. **Edit the next phase's issue body to include the handoff** (skip if this is the final phase) — follow the canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists:
+   1. `Bash`: `gh issue view <next_phase_issue> --json body -q .body` — capture stdout.
+   2. `Write` tool: save to `/tmp/next_phase_body.md`.
+   3. `Edit` tool: `old_string` = the `Pending — will be linked after Phase <N-1> completes` placeholder (long enough to be unique), `new_string` = a `<details><summary>📋 Handoff from Phase <N></summary>\n\n<handoff content>\n\n</details>` block.
+   4. `Bash`: `gh issue edit <next_phase_issue> --body-file /tmp/next_phase_body.md`.
 
-```bash
-gh issue view <next_phase_issue> --json body -q .body > /tmp/next_phase_body.md
-# (replace the "Pending" placeholder with the full handoff inside a collapsible <details> block)
-gh issue edit <next_phase_issue> --body-file /tmp/next_phase_body.md
-```
-
-2. Close the current phase issue:
+2. **Close the current phase issue:**
 
 ```bash
 gh issue close <current_phase_issue>
 ```
 
-3. Check off the phase in the plan overview issue (same fetch-replace-update pattern):
-
-```bash
-gh issue view <plan_overview_issue> --json body -q .body > /tmp/overview_body.md
-# (replace "- [ ] ... #<current_phase_issue>" with "- [x] ...")
-gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md
-```
+3. **Check off the phase in the plan overview issue** (same canonical 4-step pattern):
+   1. `Bash`: `gh issue view <plan_overview_issue> --json body -q .body` — capture stdout.
+   2. `Write` tool: save to `/tmp/overview_body.md`.
+   3. `Edit` tool: `old_string: "- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<current_phase_issue>"`, `new_string: "- [x] Phase <N>: <phase_name> (<task_count> tasks) — #<current_phase_issue>"`.
+   4. `Bash`: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`.

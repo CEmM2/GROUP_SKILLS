@@ -10,10 +10,9 @@
 
 ## Skills to Load Before Starting
 
-- `computational-mechanics`
-- `taichi-sim-reviewer`
-- `taichi-gpu-sim`
-- [any additional skills relevant to Phase <phase_id+1>]
+<!-- List skills relevant to Phase <phase_id+1> based on the task types involved.
+     Check the project's CLAUDE.md for available domain skills. -->
+- <skill relevant to next phase's tasks>
 
 ---
 

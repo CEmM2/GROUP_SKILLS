@@ -10,6 +10,14 @@ Pre-execution scaffolding pass — generates test stubs, populates test fields i
 
 ---
 
+## Step 0 — Re-scaffold Check
+
+If `Phase_<phase_id>_Scaffold_Validation.md` already exists in `<tasks_folder>`, this phase was previously scaffolded. Warn the user and list what will be affected (test stubs may be overwritten, task JSONs will be re-updated). Proceed only with explicit confirmation. If the user confirms, rename the existing validation file to `Phase_<phase_id>_Scaffold_Validation_prev.md` before continuing.
+
+Also check the phase issue labels in `github_issue_map.json` — if the phase was already scaffolded (label `scaffolded` present), note this in the warning.
+
+---
+
 ## Step 1 — Load Context
 
 Read the `<plan_file>` in full to understand:
@@ -68,13 +76,13 @@ For each task in `<phase_id>`, spawn a subagent (Haiku is sufficient — this is
 Provide each subagent with:
 - The full task JSON content
 - The plan context for this phase
-- The existing test folder structure: run `find tests/ -name "*.py" -type f | head -40` and include the output so the subagent can match naming conventions
+- The existing test folder structure: use Glob to search `tests/**/*.py` and include the first 40 results so the subagent can match naming conventions
 
 The subagent must:
 
 1. **Search for existing tests** that already cover this task before generating anything:
-   - Search the `tests/` directory for test functions or classes whose names, docstrings, or tested symbols overlap with the task's `objective`, `acceptance_criteria`, or `deliverables`
-   - Run `grep -r "<key terms from task objective>" tests/` for 2–3 representative terms
+   - Use `/qmd-search` to search the project's test collection for test functions or classes whose names, docstrings, or tested symbols overlap with the task's `objective`, `acceptance_criteria`, or `deliverables`
+   - Use both lexical (`type:'lex'`) and semantic (`type:'vec'`) queries with 2-3 representative terms from the task objective
    - For each existing test found, assess whether it fully covers a `test_plan.cases` entry, partially covers it, or is unrelated
    - Classify each `test_plan.cases` entry as: `covered`, `partial`, or `missing`
    - Only generate stubs for `partial` and `missing` cases
@@ -232,11 +240,10 @@ Replace the skeleton phase issue body with the populated version using the templ
 - Phase context summary
 - Handoff from previous phase (if it exists — verify it's in the body; if missing, embed it now from `Handoff_Phase_<N>.md` inside a collapsible `<details>` block)
 
-Swap labels: remove `not-scaffolded`, add `scaffolded`.
+Because this is a full body replacement (not a surgical edit), use the `Write` tool to build the new body from the template, then push it:
 
-```bash
-gh issue edit <phase_issue> --remove-label "not-scaffolded" --add-label "scaffolded" --body-file <tempfile>
-```
+1. `Write` tool: render the populated template into `/tmp/phase_body.md`.
+2. `Bash`: `gh issue edit <phase_issue> --remove-label "not-scaffolded" --add-label "scaffolded" --body-file /tmp/phase_body.md`.
 
 ### 7d. Update issue map and task JSONs
 

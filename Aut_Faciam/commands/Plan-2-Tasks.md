@@ -68,12 +68,7 @@ Create `<tracking_file>` following the template at `templates/tasks-tracker_temp
 
 ## Step 6 — Generate Context Files
 
-For each implementation phase, distill a **must know** and **should know** knowledge set and place it in `<tasks_folder>`, naming it `Phase_<phase_id>_context_summary.md`, including:
-- Conventions
-- Key principles
-- Allowed deviation from specs — **only if explicitly written in the plan**
-- Phase-relevant pre-resolved design decisions
-- Downstream impact of the phase
+For each implementation phase, distill a **must know** and **should know** knowledge set and place it in `<tasks_folder>`, naming it `Phase_<phase_id>_context_summary.md`, following the template at `templates/phase_context_summary.md`.
 
 ## Step 7 — Create GitHub Issues (Plan Overview + Phase Skeletons)
 
@@ -132,7 +127,12 @@ Capture each issue number.
 
 ### 7d. Update plan overview with real issue numbers
 
-After all phase issues exist, edit the plan overview issue body to replace placeholder `#<phase_issue_number>` references with actual numbers.
+After all phase issues exist, update the plan overview issue body to replace placeholder `#<phase_issue_number>` references with the actual numbers. Use the canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists:
+
+1. `Bash`: `gh issue view <plan_overview_issue> --json body -q .body` — capture stdout.
+2. `Write` tool: save to `/tmp/overview_body.md`.
+3. `Edit` tool (one call per placeholder, or `MultiEdit` if the tool supports batching): replace each `#<phase_issue_number>` placeholder with the real `#<N>`. Use `replace_all: false` — each placeholder appears exactly once in the body.
+4. `Bash`: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`.
 
 ### 7e. Create the issue mapping file
 

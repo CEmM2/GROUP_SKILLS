@@ -5,7 +5,7 @@ Execute a single task through all quality gates, then present a full report for 
 This command is for when you want to work through one task at a time — see the full implementation, gate results, and failure history before moving on. It runs the implementer and all three gates autonomously, then gives you the complete picture.
 
 **Inputs:**
-- `<task_id>`: the specific task to execute (e.g., `T2.3`)
+- `<task_id>`: the specific task to execute (e.g., `P2-3`)
 - `<plan_file>`: path to the markdown plan, spec, or RFC document
 - `<tasks_folder>`: if provided, otherwise defaults to `dev/tasks/<plan file name>/`
 - `<tracking_file>`: if provided, otherwise defaults to `dev/tracking/tasks-tracker_<plan file name>.md`
@@ -40,10 +40,10 @@ Read:
 If not already on a phase branch:
 
 ```bash
-git checkout -b <plan_name>_phase-<phase>
+git checkout -b <plan_slug>_phase-<phase>
 ```
 
-Or verify you're on the correct branch.
+Or verify you're on the correct branch. The `plan_slug` is found in `github_issue_map.json`. If the map doesn't exist yet (Plan-2-Tasks was run without GitHub), derive it the same way: lowercase the plan filename, replace underscores/spaces with hyphens, drop the extension.
 
 ---
 
@@ -64,6 +64,8 @@ Initialize the task entry in `gates/phase_<phase>_gates.md`.
 ## Step 4 — Gate Sequence (autonomous)
 
 Run all three gates in sequence. No `gh` calls during this phase — all results go to the gates file.
+
+Gates A&B pass rule: start from 10; deduct 1 point per minor issue and 2 points per medium issue. Pass only if the score is ≥ 8 and there are no high or critical issues.
 
 ### Gate A — Spec Compliance
 
@@ -103,7 +105,7 @@ gh issue edit <task_issue> --remove-label "in-progress" --add-label "done,gate-a
 gh issue close <task_issue>
 ```
 
-Update phase issue tasklist (fetch-replace-update pattern).
+Update phase issue tasklist using the canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists (fetch via `gh issue view`, materialise with `Write` tool, mutate with `Edit` tool, push back via `gh issue edit --body-file`).
 
 Unblock downstream tasks if applicable.
 
@@ -114,7 +116,7 @@ Unblock downstream tasks if applicable.
 After everything completes, present a summary to the user. This is the key difference from ExecPhase — instead of immediately moving to the next task, pause and show the full picture:
 
 ```markdown
-## Task <task_id>: <title> — Complete ✅
+## Task <task_id>: <title> — Complete
 
 ### Implementation Summary
 <what was built, which files changed>

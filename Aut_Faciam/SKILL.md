@@ -86,6 +86,18 @@ All labels are created idempotently via `gh label create --force`. Plan-2-Tasks 
 | `tier:integration` | `#f9d0c4` | Integration test tier |
 | `tier:regression` | `#f9d0c4` | Regression test tier |
 
+### Recovery and Rollback
+
+If a task fails Gate C repeatedly or a high-risk task destabilizes the branch:
+
+1. **Identify the last good commit:** Check `gates/phase_<N>_gates.md` for the last passing Gate C entry — it records the commit SHA.
+2. **Revert the broken task:** `git revert <bad_commit_sha>` — this preserves history. **NEVER** use `git reset --hard`.
+3. **Update the task JSON:** Set `status` back to `"pending"`, clear `completion_date` and `test_completion`.
+4. **Update the tracker:** Mark the task as `reverted` with a note pointing to the gate history entry.
+5. **Re-attempt or escalate:** Re-dispatch the task with the failure context from the gates file, or flag it to the user for manual intervention.
+
+If the entire phase branch is unrecoverable, create a new branch from the parent branch and re-execute only the incomplete tasks (the gate history and task JSONs track which tasks completed successfully).
+
 ### Idempotency and Error Handling
 
 **First step for any command with GitHub steps:** Run `gh auth status` to verify `gh` is available and authenticated. If it fails, skip all GitHub steps for this command run and warn the user. The local pipeline (task JSONs, tracker, scaffold reports, gate history) must work independently — issues are a convenience layer, not a dependency.
@@ -127,13 +139,22 @@ See `templates/gate_entry.md` for the format.
 
 ### Updating Issue Body Checklists
 
-Several commands need to check off items in issue bodies (task checkoffs in phase issues, phase checkoffs in plan overview). The pattern is always:
+Several commands need to check off items in issue bodies (task checkoffs in phase issues, phase checkoffs in plan overview). Use the **tool-based** workflow below — it is the canonical pattern for every body mutation this skill performs. Do **not** use `sed`, `awk -i inplace`, `perl -i`, or `python -c` to rewrite the file: those are shell mutations that require per-invocation approval under Claude Code's `accept-edits` mode, which breaks the autonomy of this pipeline. The `Write` and `Edit` tools, by contrast, run autonomously under `accept-edits`.
 
-1. Fetch current body: `gh issue view <issue_number> --json body -q .body > /tmp/issue_body.md`
-2. Replace `- [ ] #<N>` with `- [x] #<N>` in the file
-3. Update: `gh issue edit <issue_number> --body-file /tmp/issue_body.md`
+**Canonical 4-step pattern** (applies to every fetch-modify-update of an issue body):
 
-Use temp files for bodies — never pass multi-line markdown as inline `--body` arguments.
+1. **Fetch (1 Bash call, no shell redirect).** Run `gh issue view <issue_number> --json body -q .body` and let stdout return through the tool result. Do **not** redirect with `> /tmp/issue_body.md` — the redirect is an extra shell feature that adds nothing over capturing stdout directly.
+2. **Materialise (Write tool).** Use the `Write` tool to save the captured body to a temp file, e.g. `/tmp/issue_body.md`. This is auto-approved under `accept-edits`.
+3. **Mutate (Edit tool, exact-string).** Use the `Edit` tool to perform the exact-string replacement — e.g. `old_string: "- [ ] #<N>"`, `new_string: "- [x] #<N>"`. The `#<N>` disambiguates the match so no `replace_all` is needed. For larger structural replacements (e.g. swapping a `Pending` placeholder for a multi-line `<details>` block), use one Edit call with a sufficiently long `old_string` to make the match unique. Edit runs autonomously under `accept-edits`.
+4. **Push back (1 Bash call).** Run `gh issue edit <issue_number> --body-file /tmp/issue_body.md`.
+
+**Bash-call budget:** exactly 2 per body update (one `gh issue view` read, one `gh issue edit` write). Everything in between is tool-driven and autonomous.
+
+**Why not MultiEdit or just Write a fresh body?** `MultiEdit` is fine if you need to flip several checkboxes in one pass (e.g. Plan-2-Tasks 7d populates N placeholder `#<phase_issue_number>` tokens with the real numbers at once — one `MultiEdit` call does this). `Write` (dumping a freshly-constructed body) is the right choice when the rewrite is structural enough that no exact-string match exists (e.g. regenerating the entire phase-populated body from the template). Prefer `Edit`/`MultiEdit` over `Write` when possible — the surgical diff is easier to audit and the exact-match requirement catches accidental drift.
+
+**Fallback — genuine bulk-regex cases.** If you ever hit a case where the old string is not known ahead of time (for example, "strip every timestamp matching `\d{4}-\d{2}-\d{2}` regardless of value" across a body you haven't read), Edit's exact-string match won't work. In that case, and **only** that case, fall back to a single `sed` / `python -c` invocation, document the reason inline (one-line comment above the command), and accept that it will require approval. No such case exists in the current skill — every mutation below is a known-string swap.
+
+Never pass multi-line markdown as inline `--body` arguments — always go through the tempfile.
 
 ### Tracker Remains Authoritative
 
@@ -154,6 +175,16 @@ Each task is a JSON file in `<tasks_folder>/json/`. The template is at `template
 ```
 
 `task_issue` is `null` until ScaffoldPhase creates the task-level issue.
+
+### Valid `asset_type` values for `plan_assets`
+
+| Value | Meaning |
+|-------|---------|
+| `code_snippet` | Inline code from the plan (pseudocode, signatures, examples) |
+| `equation` | Mathematical formula or derivation |
+| `diagram` | Flow chart, architecture diagram, or schematic |
+| `table` | Data table, constant definitions, or parameter sets |
+| `constraint` | Explicit requirement or invariant stated in the plan |
 
 ---
 
