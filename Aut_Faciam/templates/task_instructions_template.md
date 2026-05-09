@@ -11,80 +11,51 @@ Task tool (general-purpose):
     ## Phase Context
 
     <summary of what this phase accomplishes and how this task fits in>
-    <any relevant constraints from the plan or handoff file>
-    <architectural context: patterns in use, existing abstractions to follow>
+    <relevant constraints from the plan or handoff file>
+    <architectural context: patterns and existing abstractions to follow>
 
     ## Before You Begin
 
-    If you have questions about:
-    - The requirements or acceptance criteria
-    - The approach or implementation strategy
-    - Dependencies, assumptions, or physics correctness
-    - Anything unclear in the task description
-
-    **Ask them now.** Raise any concerns before starting work.
+    If anything is unclear (requirements, approach, dependencies, physics correctness),
+    **ask now** before starting. Do not guess on physics, constitutive model behavior,
+    or numerical stability. Pausing to clarify is always OK — also while working.
 
     ## Your Job
 
-    Once you are clear on requirements:
-    1. Implement exactly what the task specifies — nothing more, nothing less
-    2. Before writing any code, read `test_artifacts` and `verification_commands` from the task JSON.
-       The scaffold pass has already classified each test case — act accordingly:
-       - `covered`: run the existing test immediately as a baseline; it must pass after implementation
-       - `partial`: a stub exists — flesh it out into a real, asserting test before implementing,
-         then make it pass (TDD red-green)
-       - `missing`: a stub exists with `pytest.skip` — replace the skip with real assertions before
+    Implement exactly what the task specifies — nothing more, nothing less.
+
+    1. Read `test_artifacts` and `verification_commands` from the task JSON. Each test
+       case has been classified by the scaffold pass:
+       - `covered`: existing test — run as baseline; must pass after implementation
+       - `partial`: stub exists — flesh out into a real, asserting test before
          implementing, then make it pass (TDD red-green)
-       If `test_artifacts` is empty or missing, generate dedicated tests before implementing.
-    3. Run all task-relevant tests (existing + fleshed-out stubs); iterate until ≥ 95% pass
-    4. Dry-run failure-route analysis: read every file you modified and identify failure paths
-       not covered by any test. For each uncovered path, write an additional test and
-       re-iterate until ≥ 95% of ALL task-relevant tests pass (including newly added ones)
-    5. Commit your work (separate commit if complexity OR risk ≥ 3)
-    6. Self-review (see below)
-    7. Report back
+       - `missing`: stub with `pytest.skip` exists — replace skip with real assertions
+         before implementing, then make it pass (TDD red-green)
+       If `test_artifacts` is empty, generate dedicated tests before implementing.
+    2. Run all task-relevant tests; iterate until ≥ 95% pass.
+    3. Dry-run failure-route analysis: read every modified file, identify uncovered
+       failure paths, add tests, re-iterate until ≥ 95% pass on the full set.
+    4. Commit (separate commit if complexity OR risk ≥ 3).
+    5. Self-review (below).
+    6. Report back.
 
     Work from: <working directory>
 
-    **While you work:** If you encounter something unexpected or unclear, ask questions.
-    It is always OK to pause and clarify. Do not guess or make assumptions — especially
-    on physics, constitutive model behavior, or numerical stability.
+    ## Self-review before reporting
 
-    ## Before Reporting Back: Self-Review
+    - Spec covered fully, no extras (YAGNI).
+    - Physics/numerics consistent with variational + Total Lagrangian foundation
+      where applicable; stress-strain conjugacy and objectivity respected.
+    - Tests verify behavior, not mocks; failure paths covered.
+    - Names + style match surrounding code.
+    - Fresh test run shows ≥ 95% pass; record exact counts.
 
-    Review your work with fresh eyes. Ask yourself:
-
-    **Completeness:**
-    - Did I implement everything in the spec?
-    - Are there requirements I skipped or misread?
-    - Are there edge cases I did not handle?
-
-    **Physics and numerics:**
-    - Is the implementation consistent with the variational/balance-law foundation?
-    - Are stress-strain conjugacy and objectivity requirements respected?
-    - Have I verified consistency with the Total Lagrangian formulation where applicable?
-
-    **Quality:**
-    - Is this my best work?
-    - Are names clear and accurate?
-    - Is the code clean, idiomatic, and consistent with existing patterns?
-
-    **Discipline:**
-    - Did I avoid overbuilding (YAGNI)?
-    - Did I only build what was requested?
-
-    **Testing:**
-    - Do tests verify behavior, not just mock behavior?
-    - Did I follow TDD?
-    - Is coverage comprehensive including failure paths?
-
-    If you find issues during self-review, fix them now before reporting.
+    Fix any issues found before reporting.
 
     ## Report Format
 
-    When done, report:
     - What you implemented
     - Tests written and results (exact pass/fail counts from a fresh run)
     - Files changed (with file paths)
-    - Self-review findings (if any) and how you resolved them
+    - Self-review findings and resolutions
     - Any concerns or open questions

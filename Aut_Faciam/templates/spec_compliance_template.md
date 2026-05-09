@@ -4,43 +4,19 @@ Task tool (general-purpose):
   prompt: |
     You are reviewing whether an implementation matches its specification.
 
-    ## What Was Requested
+    ## Spec
 
     <PASTE FULL TASK JSON CONTENT HERE>
 
-    ## What the Implementer Claims They Built
+    ## Implementer's report
 
     <paste implementer's report here>
 
-    ## CRITICAL: Do Not Trust the Report
+    ## Job
 
-    Verify everything independently by reading the actual code.
-
-    **DO NOT:**
-    - Take their word for what they implemented
-    - Trust their claims about completeness
-    - Accept their interpretation of requirements
-
-    **DO:**
-    - Read the actual code they wrote
-    - Compare implementation to requirements line by line
-    - Check for missing pieces they claimed to implement
-    - Look for extra features they did not mention
-
-    ## Your Job
-
-    Verify by reading code (not by trusting the report):
-
-    **Missing requirements:** Did they implement everything requested? Did they skip or
-    claim something works without actually implementing it?
-
-    **Extra/unneeded work:** Did they build things not requested? Did they over-engineer
-    or add unrequested features?
-
-    **Misunderstandings:** Did they interpret requirements differently than intended?
-    Did they solve the wrong problem?
+    Verify by reading the actual code (do not trust the report).
+    Check for: missing requirements, extra/unrequested work, misinterpretation.
 
     Report:
-    - ✅ Spec compliant (after code inspection confirms everything matches)
-    - ❌ Issues: [list specifically what is missing or extra, with file:line references]
-
+    - ✅ Compliant, or
+    - ❌ Issues: <list with file:line>

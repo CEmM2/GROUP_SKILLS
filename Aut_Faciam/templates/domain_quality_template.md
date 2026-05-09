@@ -4,53 +4,36 @@ Task tool (general-purpose):
   prompt: |
     You are reviewing an implementation for domain correctness and code quality.
 
-    ## Task Specification
+    ## Spec
 
     <PASTE FULL TASK JSON CONTENT HERE>
 
-    ## Implementer's Report
+    ## Implementer's report
 
     <paste implementer's report here>
 
-    ## Diff to Review
+    ## Diff
 
-    Base: <BASE_SHA>
-    Head: <HEAD_SHA>
-
+    Base: <BASE_SHA> · Head: <HEAD_SHA>
     Run `git diff <BASE_SHA>..<HEAD_SHA>` to see the changes.
+    Design docs: review against `dev/design_docs/` and any docs referenced from the
+    task's `plan_file` or `plan_assets`.
 
-    ## Design Documents
+    ## Job
 
-    Review against: `dev/design_docs/`
-    Read any design docs referenced by the task's plan_file or plan_assets.
+    Verify by reading the diff (do not trust the report). Check:
 
-    ## CRITICAL: Verify by Reading Code
-
-    Do not trust the implementer's report. Read the actual diff.
-
-    ## Your Job
-
-    **Physics and numerics:**
-    - Is the implementation consistent with the variational/balance-law foundation?
-    - Are tensor operations, stress-strain conjugacy, and objectivity requirements correct?
-    - Are numerical tolerances appropriate for the dtype in use?
-    - Do boundary conditions and loading match the spec?
-
-    **Code quality:**
-    - Does the code follow existing patterns and conventions in the codebase?
-    - Are names clear, accurate, and consistent with the domain?
-    - Is there unnecessary complexity or over-engineering?
-
-    **Integration safety:**
-    - Does the change break any existing interfaces or assumptions?
-    - Are imports, function signatures, and data flows consistent with callers?
-
-    **Design doc adherence:**
-    - Does the implementation match the design documents?
-    - Are there deviations? If so, are they justified?
+    - **Physics/numerics**: variational/balance-law consistency; tensor ops, stress-strain
+      conjugacy, objectivity; tolerances appropriate for dtype; BCs and loading match spec.
+    - **Code quality**: follows existing patterns and conventions; names clear and accurate;
+      no unnecessary complexity.
+    - **Integration safety**: no broken interfaces or assumptions; imports, signatures, data
+      flows consistent with callers.
+    - **Design doc adherence**: matches design docs; deviations justified.
 
     Report:
-    - Score (0-10): start from 10; deduct 1 point per minor issue and 2 points per medium issue; report the breakdown: minor / medium / high / critical issue counts
-    - Approved — only if score ≥ 8 and there are no high or critical issues
-    - If score < 8, do not approve; the implementer must fix the issues and re-run the Gate.
-    - Issues: [list each with severity, file:line, and explanation]
+    - Score (0–10): start from 10; deduct 1 per minor issue, 2 per medium issue. Report
+      breakdown: minor / medium / high / critical counts.
+    - Approved only if score ≥ 8 and zero high/critical issues. Otherwise the implementer
+      must fix and re-run the gate.
+    - Issues: each with severity, file:line, explanation.

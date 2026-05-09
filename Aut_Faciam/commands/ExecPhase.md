@@ -182,21 +182,19 @@ When all tasks in the current phase are complete and verified, generate a handof
 
 **If this is the final phase** (no next phase exists), still generate the handoff as a project completion summary, but skip the "edit next phase issue" step. Close the current phase issue and check it off in the plan overview. The plan overview issue itself stays open as a record — the user can close it manually when they consider the plan fully delivered.
 
-### GitHub updates (3 `gh` calls, or 2 if final phase):
+The handoff lives in `<tasks_folder>/Handoff_Phase_<next_phase_id>.md`; the next
+phase issue's `**Handoff in:**` line points at this file in the repo, so no GitHub
+body edit is needed for handoff propagation.
 
-1. **Edit the next phase's issue body to include the handoff** (skip if this is the final phase) — follow the canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists:
-   1. `Bash`: `gh issue view <next_phase_issue> --json body -q .body` — capture stdout.
-   2. `Write` tool: save to `/tmp/next_phase_body.md`.
-   3. `Edit` tool: `old_string` = the `Pending — will be linked after Phase <N-1> completes` placeholder (long enough to be unique), `new_string` = a `<details><summary>📋 Handoff from Phase <N></summary>\n\n<handoff content>\n\n</details>` block.
-   4. `Bash`: `gh issue edit <next_phase_issue> --body-file /tmp/next_phase_body.md`.
+### GitHub updates (2 `gh` calls):
 
-2. **Close the current phase issue:**
+1. **Close the current phase issue:**
 
 ```bash
 gh issue close <current_phase_issue>
 ```
 
-3. **Check off the phase in the plan overview issue** (same canonical 4-step pattern):
+2. **Check off the phase in the plan overview issue** (canonical 4-step pattern from SKILL.md § Updating Issue Body Checklists):
    1. `Bash`: `gh issue view <plan_overview_issue> --json body -q .body` — capture stdout.
    2. `Write` tool: save to `/tmp/overview_body.md`.
    3. `Edit` tool: `old_string: "- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<current_phase_issue>"`, `new_string: "- [x] Phase <N>: <phase_name> (<task_count> tasks) — #<current_phase_issue>"`.

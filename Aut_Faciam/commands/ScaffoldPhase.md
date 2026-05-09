@@ -174,14 +174,10 @@ Append to `Phase_<phase_id>_Scaffold_Validation.md`:
 | Metric | Value |
 |--------|-------|
 | Tasks scaffolded | N |
-| Test cases assessed | N |
-| Cases covered by existing tests | N |
-| Cases partially covered (stubs generated) | N |
-| Cases with no existing tests (stubs generated) | N |
-| New stub files created | N |
-| Total new stubs generated | N |
-| Tasks fully covered by existing tests (no stub needed) | N |
-| Tasks needing human review | N |
+| Cases covered | N |
+| Cases stubbed | N |
+| Tasks needing review | N |
+| Files created | N |
 | Auto-filled fields | <list> |
 
 ## Existing Test Coverage Found
@@ -235,10 +231,10 @@ Capture the returned issue number. Save to `github_issue_map.json` immediately a
 ### 7c. Update the phase issue
 
 Replace the skeleton phase issue body with the populated version using the template at `templates/phase_populated_issue.md`. Include:
-- Scaffold summary metrics
+- Scaffold summary metrics (collapsed: tasks scaffolded / cases covered / cases stubbed / tasks needing review / files created)
 - Task checklist with real issue numbers (`- [ ] #<task_issue> — <title>`)
-- Phase context summary
-- Handoff from previous phase (if it exists — verify it's in the body; if missing, embed it now from `Handoff_Phase_<N>.md` inside a collapsible `<details>` block)
+- A `**Context:**` link to `Phase_<N>_context_summary.md` (relative path; do not embed)
+- A `**Handoff in:**` link to `Handoff_Phase_<N>.md` if it exists (relative path; do not embed)
 
 Because this is a full body replacement (not a surgical edit), use the `Write` tool to build the new body from the template, then push it:
 

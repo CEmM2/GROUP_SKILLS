@@ -115,7 +115,7 @@ Concrete budget per lifecycle event:
 - Plan-2-Tasks: ~(14 + 2×N_phases + 2) calls — 14 base labels (including plan:<slug>) + N phase labels + 1 overview + N phase skeletons + 1 overview update
 - ScaffoldPhase: ~(N_tasks + 2) calls — N task issues + 1 phase body update + 1 label swap
 - ExecTask: 3-4 calls — 1 label in-progress, 1 label done + 1 close, 1 phase body update, +1 per unblocked downstream task
-- ExecPhase: same as ExecTask × N_tasks + 3 for phase handoff
+- ExecPhase: same as ExecTask × N_tasks + 2 for phase handoff (close current + check off in overview)
 
 ### Gate History Files (Hybrid Markdown + JSON)
 
@@ -150,11 +150,7 @@ Several commands need to check off items in issue bodies (task checkoffs in phas
 
 **Bash-call budget:** exactly 2 per body update (one `gh issue view` read, one `gh issue edit` write). Everything in between is tool-driven and autonomous.
 
-**Why not MultiEdit or just Write a fresh body?** `MultiEdit` is fine if you need to flip several checkboxes in one pass (e.g. Plan-2-Tasks 7d populates N placeholder `#<phase_issue_number>` tokens with the real numbers at once — one `MultiEdit` call does this). `Write` (dumping a freshly-constructed body) is the right choice when the rewrite is structural enough that no exact-string match exists (e.g. regenerating the entire phase-populated body from the template). Prefer `Edit`/`MultiEdit` over `Write` when possible — the surgical diff is easier to audit and the exact-match requirement catches accidental drift.
-
-**Fallback — genuine bulk-regex cases.** If you ever hit a case where the old string is not known ahead of time (for example, "strip every timestamp matching `\d{4}-\d{2}-\d{2}` regardless of value" across a body you haven't read), Edit's exact-string match won't work. In that case, and **only** that case, fall back to a single `sed` / `python -c` invocation, document the reason inline (one-line comment above the command), and accept that it will require approval. No such case exists in the current skill — every mutation below is a known-string swap.
-
-Never pass multi-line markdown as inline `--body` arguments — always go through the tempfile.
+Use `MultiEdit` for several known-string swaps in one pass; use `Write` (full template render) when the rewrite is structural enough that no exact-string match exists. Prefer `Edit`/`MultiEdit` over `Write` when feasible — the surgical diff is easier to audit. Never pass multi-line markdown as inline `--body` arguments — always go through the tempfile.
 
 ### Tracker Remains Authoritative
 

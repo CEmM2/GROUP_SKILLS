@@ -1,5 +1,8 @@
 # Phase <phase_id> Handoff
 
+> **Authoring rule:** skip any section, table row, or header below that has no
+> content for this phase. Do not carry empty placeholders forward — drop them.
+
 > **From**: Phase <phase_id> agent  
 > **To**: Phase <phase_id+1> agent  
 > **Date**: YYYY-MM-DD  
