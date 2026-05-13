@@ -207,7 +207,7 @@ Per `references/issue_body_updates.md`:
 1. `Bash`: `gh issue view <phase_issue> --json body -q .body`
 2. `Write` tool: `/tmp/phase_<N>_body.md`
 3. `MultiEdit`: for each task ID in `completed_this_phase`, replace `- [ ] <task_id>` → `- [x] <task_id>` (one MultiEdit call, N edits)
-4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md --remove-label "in-progress" --add-label "done"` — also closes via `gh issue close <phase_issue>`
+4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md --remove-label "in-progress" --add-label "done" --state closed` — body update, label swap, and close in one call.
 
 ### 10c. Plan overview checkbox
 
@@ -218,7 +218,7 @@ Per `references/issue_body_updates.md`:
 3. `Edit` tool: `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`
 4. `Bash`: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`
 
-**Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 phase edit, 1 phase close, 1 overview view + 1 overview edit = 5 actually — but compare to Aut_Faciam's 2 + 2N for per-task flips during the phase).
+**Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
 
 ---
 

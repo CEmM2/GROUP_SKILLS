@@ -14,8 +14,10 @@ Failure-mode taxonomy lives in `references/failure_modes.md` — refer to it whe
 
 ```json
 {"gate":"A","attempt":1,"result":"fail","failure_mode":"missing_impl",
- "what_failed":"…","why":"…","resolution":"…","timestamp":"<ISO>"}
+ "what_failed":"…","why":"…","timestamp":"<ISO>"}
 ```
+
+(`resolution` belongs to the PASS attempt that follows a FAIL — see the canonical example below.)
 ````
 
 JSON fields:

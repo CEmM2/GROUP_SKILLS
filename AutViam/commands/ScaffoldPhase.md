@@ -78,7 +78,7 @@ qmd_search_terms: <2-3 representative terms from objective>
 1. `Read` the task JSON. Use `objective`, `acceptance_criteria`, `test_plan`, `deliverables`.
 2. Search the project's test collection via `/qmd-search` with `type:'lex'` and `type:'vec'` queries on the search terms. Find tests whose names, docstrings, or tested symbols overlap with `objective`/`acceptance_criteria`/`deliverables`.
 3. Classify each `test_plan.cases` entry as `covered`, `partial`, or `missing`. Skip stub creation entirely if all are `covered`.
-4. Determine the test file path: follow the layout in `test_layout_summary`. If `tests/plan_tests/` exists, place stubs there; else `tests/plan_tests/test_<task_id>.py`.
+4. Determine the test file path: follow the layout in `test_layout_summary`. Stub filename is always `test_<task_id>.py`. Place it at `tests/plan_tests/test_<task_id>.py` whether or not `tests/plan_tests/` already exists — create the directory if missing.
 5. Generate one stub per `partial`/`missing` case:
 
    ```python

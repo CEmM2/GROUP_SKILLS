@@ -4,7 +4,7 @@
     "phase": "",
     "objective": "",
     "plan_file": "",
-    "plan_lines": ["", ""],
+    "plan_lines": [null, null],
     "plan_assets": [],
     "blocked_by": [],
     "blocks": [],
