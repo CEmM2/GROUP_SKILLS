@@ -23,6 +23,7 @@ Parse the first token of `$@` and read the matching command file from `commands/
 | `scaffold <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ScaffoldPhase.md` |
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
+| `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks]` | `commands/E2E.md` |
 
 Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer Agents). On-demand references live in `references/`.
 
@@ -86,10 +87,16 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/issue_body_updates.md` — canonical fetch→Write→Edit→push pattern for GitHub issue body mutations. Read when first touching an issue body in a session.
 - `references/failure_modes.md` — failure-mode taxonomy for gate entries. Read when first writing a gate failure entry.
 
-### Reviewer Agents
-Gate A (spec compliance) and Gate B (domain quality) are run as named Claude Code subagents — `autviam-spec-reviewer` and `autviam-domain-reviewer` — defined in `agents/`. Invoke via the Agent tool with `subagent_type` set to the agent name.
+### Subagents
+Three named Claude Code subagents are defined in `agents/`:
 
-**Install (once per consuming repo):** symlink or copy the two `agents/*.md` files into `.claude/agents/` so Claude Code picks them up. If the agents are not installed, ExecPhase/ExecTask falls back to dispatching the Task tool with the agent's system prompt inlined — same behavior, slightly more tokens.
+| Agent | Role | Invoked from |
+|---|---|---|
+| `autviam-spec-reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
+| `autviam-domain-reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
+| `autviam-phase-orchestrator` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
+
+**Install (once per consuming repo):** symlink or copy `agents/*.md` into `.claude/agents/` so Claude Code picks them up. If a reviewer agent is missing, ExecPhase/ExecTask fall back to inlined Task-tool dispatch with the agent's system prompt. The orchestrator has no fallback — if it's missing or nested dispatch is blocked, E2E halts on its pre-flight check (see `commands/E2E.md` § Nested-Dispatch Pre-flight).
 
 The implementer remains template-based (`templates/task_instructions_template.md`) because per-phase context is injected per dispatch.
 
