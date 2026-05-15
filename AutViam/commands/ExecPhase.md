@@ -50,12 +50,26 @@ Never implement on `main`/`master` without explicit user consent.
 
 Dispatch via the Task tool using `templates/task_instructions_template.md`. The template tells the implementer to `Read` the task JSON itself — **do not paste JSON content into the prompt**.
 
+**Pre-dispatch skill check (deterministic bash):**
+```bash
+test -f <skill_root>/autviam_config.json && cat <skill_root>/autviam_config.json
+```
+If the config exists, read `implementer.skills`. For each skill, run:
+```bash
+git diff --name-only <pre-task SHA>..<current HEAD> | grep -E '<skill.trigger_patterns[0]>'
+# repeat for each pattern (OR logic — any match qualifies)
+```
+Build `implementer_skills`: list of `{skill, skill_md}` for each skill where at least one diff file matched.
+If the config is absent or `implementer_skills` is empty, omit the `## Repo-configured skills` section from the prompt (backward compatible).
+`skill_md` path: `<skill_root>/../<skill-dir>/SKILL.md` (resolve relative to the AutViam skill root).
+
 Pass to the implementer:
 - `task_json_path: <tasks_folder>/json/<task_id>.json`
 - `phase_context_path: <tasks_folder>/Phase_<phase_id>_context_summary.md`
 - `handoff_path` (if phase > 1)
 - Plan excerpts: only the `plan_lines` ranges from the task's `plan_assets` (or none)
 - Any cross-phase failure patterns from Step 1's scan that match this task's risk
+- `implementer_skills` (if non-empty): inject as the `## Repo-configured skills` section in the template
 
 If the implementer asks clarifying questions before starting, answer them fully before allowing it to proceed.
 

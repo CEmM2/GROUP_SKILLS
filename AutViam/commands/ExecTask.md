@@ -40,6 +40,12 @@ git checkout -b <plan_slug>_phase-<phase>
 
 Use `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content.
 
+**Pre-dispatch skill check (deterministic bash):** same as ExecPhase Step 5 — read
+`<skill_root>/autviam_config.json` if present, test each skill's `trigger_patterns`
+against `git diff --name-only <base_sha>..<head_sha>`, build `implementer_skills` list
+(omit `## Repo-configured skills` section from prompt if empty). Pass `implementer_skills`
+to the implementer prompt when non-empty.
+
 Initialize the task entry in `gates/phase_<phase>_gates.md`.
 
 **No `gh` call here** — there is no per-task issue under AutViam.

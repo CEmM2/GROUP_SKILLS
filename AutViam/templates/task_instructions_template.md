@@ -22,6 +22,13 @@ Task tool (general-purpose):
 
     <inserted by orchestrator: failure-mode patterns seen in prior phases that match this task's risk>
 
+    ## Repo-configured skills
+
+    <injected by orchestrator — section omitted entirely when no skills match this task's diff>
+    These skills encode project-specific patterns you must follow. Invoke via the Skill tool
+    when the task touches their domain.
+    - **<skill-name>**: `<path-to-skill-SKILL.md>`
+
     ## Before you begin
 
     If anything is unclear (requirements, approach, dependencies, physics correctness),
