@@ -52,7 +52,14 @@ Run A → B → C in sequence. Track `gate_a_failures`, `gate_b_failures`, `gate
 Dispatch `autviam-spec-reviewer` (see ExecPhase Step 6 for the prompt template). Parse verdict. On FAIL: record + increment + loop.
 
 ### Gate B — Domain Quality
-Only after Gate A passes. Dispatch `autviam-domain-reviewer`. On FAIL: record + increment, re-run **Gate A then Gate B**.
+Only after Gate A passes.
+
+**Pre-dispatch specialist check (deterministic bash):** same as ExecPhase Gate B — read
+`<skill_root>/autviam_config.json` if present, test each specialist's `trigger_patterns`
+against `git diff --name-only <base_sha>..<head_sha>`, build `specialist_agents` list
+(omit if empty). Pass `specialist_agents` to the domain reviewer prompt.
+
+Dispatch `autviam-domain-reviewer`. On FAIL: record + increment, re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
 Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims.

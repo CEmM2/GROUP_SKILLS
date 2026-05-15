@@ -1,0 +1,23 @@
+{
+  "_comment": "Template — copy to autviam_config.json and fill values. Schema version 1.",
+  "schema_version": "1",
+  "installed_at": "YYYY-MM-DD",
+  "repo": "owner/repo-or-local",
+  "domain_reviewer": {
+    "specialists": [
+      {
+        "agent": "<agent-name-matching-.claude/agents/filename-stem>",
+        "description": "<one-line from agent frontmatter>",
+        "trigger_patterns": [
+          "^(apps|libs)/.*\\.py$"
+        ]
+      }
+    ]
+  },
+  "spec_reviewer": {
+    "specialists": []
+  },
+  "implementer": {
+    "skills": []
+  }
+}

@@ -24,6 +24,7 @@ Parse the first token of `$@` and read the matching command file from `commands/
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
 | `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks]` | `commands/E2E.md` |
+| `install [--dry-run]` | `commands/Install.md` |
 
 Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer Agents). On-demand references live in `references/`.
 
@@ -124,6 +125,36 @@ No `task_issue` field — phase-issues-only.
 
 ### Valid `asset_type` values for `plan_assets`
 `code_snippet`, `equation`, `diagram`, `table`, `constraint`.
+
+---
+
+## Post-Install Configuration (`autviam_config.json`)
+
+Run `/AutViam install` once per repo to wire up repo-specific specialists. The command
+scans `.claude/agents/` and `.claude/skills/`, proposes trigger patterns, gets user
+approval, and writes `<skill_root>/autviam_config.json`.
+
+**What the config enables:**
+- `domain_reviewer.specialists` — agents ExecPhase dispatches during Gate B when the diff
+  touches matching files. Each specialist's findings carry the same weight as the domain
+  reviewer's own findings.
+- `spec_reviewer.specialists` — agents dispatched during Gate A (rare; most repos leave
+  this empty).
+- `implementer.skills` — skills surfaced to the implementer template (future).
+
+**Runtime mechanics (deterministic — no LLM at trigger time):**
+
+Before dispatching the domain reviewer, ExecPhase runs:
+```bash
+git diff --name-only <base_sha>..<head_sha> \
+  | grep -E '<trigger_pattern>'
+```
+for each configured specialist. Only specialists with at least one matching file are included
+in the `specialist_agents` list injected into the domain reviewer prompt. An empty list means
+standard review — fully backward compatible with repos that have no config.
+
+**The config is repo-local.** It is never part of the upstream AutViam skill definition.
+Template: `templates/autviam_config_template.json`.
 
 ---
 

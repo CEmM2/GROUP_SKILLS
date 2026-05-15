@@ -89,7 +89,23 @@ Parse the verdict line. On FAIL: record the failure entry in the gates file (1�
 
 ### Gate B — Domain Quality
 
-Only after Gate A passes. Dispatch `autviam-domain-reviewer`:
+Only after Gate A passes.
+
+**Pre-dispatch specialist check (deterministic bash):**
+```bash
+# Check if repo-local specialist config exists
+test -f <skill_root>/autviam_config.json && cat <skill_root>/autviam_config.json
+```
+If the config exists, read `domain_reviewer.specialists`. For each specialist run:
+```bash
+git diff --name-only <pre-task SHA>..<current HEAD> | grep -E '<specialist.trigger_patterns[0]>'
+# repeat for each pattern (OR logic — any match qualifies)
+```
+Build `specialist_agents`: include only specialists where at least one diff file matched.
+If the config is absent or `specialist_agents` is empty, omit the field from the prompt
+(backward compatible — reviewer skips the specialist section entirely).
+
+Dispatch `autviam-domain-reviewer`:
 
 ```
 Agent(subagent_type="autviam-domain-reviewer", prompt="""
@@ -100,6 +116,7 @@ implementer_report: <one-line summary>
 phase_context_path: <tasks_folder>/Phase_<phase_id>_context_summary.md
 design_docs_dir: dev/design_docs/   # if exists
 prior_failure_summary: <only if retry>
+specialist_agents: <JSON list — omit line if empty>
 """)
 ```
 
