@@ -98,8 +98,8 @@ test -f <skill_root>/autviam_config.json && cat <skill_root>/autviam_config.json
 ```
 If the config exists, read `domain_reviewer.specialists`. For each specialist run:
 ```bash
-git diff --name-only <pre-task SHA>..<current HEAD> | grep -E '<specialist.trigger_patterns[0]>'
-# repeat for each pattern (OR logic — any match qualifies)
+git diff --name-only <base_sha>..<head_sha> | grep -E 'pattern1|pattern2|...'
+# (OR logic — any match qualifies)
 ```
 Build `specialist_agents`: include only specialists where at least one diff file matched.
 If the config is absent or `specialist_agents` is empty, omit the field from the prompt
