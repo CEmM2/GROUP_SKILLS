@@ -1,0 +1,34 @@
+{
+  "_comment": "Template — copy to autviam_c_config.json and fill values. Schema version 2-codex.",
+  "schema_version": "2-codex",
+  "installed_at": "YYYY-MM-DD",
+  "repo": "owner/repo-or-local",
+  "domain_reviewer": {
+    "specialists": [
+      {
+        "name": "<profile-name>",
+        "codex_agent_type": "explorer",
+        "prompt_file": "<repo-relative path to profile markdown>",
+        "description": "<one-line from profile frontmatter>",
+        "trigger_patterns": [
+          "^(apps|libs|src)/.*\\.py$"
+        ]
+      }
+    ]
+  },
+  "spec_reviewer": {
+    "specialists": []
+  },
+  "implementer": {
+    "skills": [
+      {
+        "skill": "<skill-name>",
+        "skill_md": "<repo-relative path to SKILL.md>",
+        "description": "<one-line from skill frontmatter>",
+        "trigger_patterns": [
+          "^(apps|libs|src)/.*\\.py$"
+        ]
+      }
+    ]
+  }
+}
