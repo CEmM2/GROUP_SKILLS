@@ -232,6 +232,22 @@ When all tasks in `<phase_id>` are done (or the user has chosen to continue past
 
 Generate `<tasks_folder>/Handoff_Phase_<phase_id+1>.md` from `templates/Handoff_template.md`. On the final phase, generate it as a project completion summary; skip the "edit next phase issue" implication.
 
+Populate the `Session Reset Packet` from `gates/phase_<phase_id>_gates.md` and each task JSON:
+
+- Include every task in the phase, including `done`, `skipped`, and `gate-cap-hit`.
+- `Gate A Score` is the final Gate A reviewer score for the task. If Gate A was not reached, use `not-run`.
+- `Gate B Score` is the final Gate B reviewer score for the task. If Gate B was not reached, use `not-run`.
+- `Gate C` is the final task-relevant test count from Gate C, or `not-run`.
+- `Decision` is a short recommendation for the next session: `accept`, `fix now`, `defer`, or `retry`.
+
+Below the table, add one concise `Gate Findings` bullet per task:
+
+- Gate A sentence: summarize the final actionable finding, or write `clean pass; no actionable findings`.
+- Gate B sentence: summarize the final actionable finding, or write `clean pass; no actionable findings`.
+- Recommended action sentence: explain the decision in one short sentence.
+
+Keep this section compact. It is a session-reset aid, not a full report; detailed evidence stays in the gates file and task reports.
+
 ### 10b. Batched phase-issue update (1 fetch + 1 push, one file edit)
 
 Per `references/issue_body_updates.md`:
