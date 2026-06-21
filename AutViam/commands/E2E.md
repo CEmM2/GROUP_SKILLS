@@ -10,6 +10,7 @@ Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2
   - `N`  (e.g. `2`)  — stop after N phases have run in this invocation, regardless of phase number.
   - *(omitted)* — run end-to-end. The loop only stops when a human-intervention trigger fires.
 - `--skip-plan-2-tasks` — assume Plan-2-Tasks already ran. Detected automatically by presence of `<tasks_folder>/all-tasks.md`; this flag forces the skip even if detection is ambiguous.
+- `--arch` — when the run finishes the whole plan (stop reason `all-phases-done`), auto-run `commands/Architecture.md` in `--feature` mode against `<plan_file>` to snapshot the implemented feature's architecture. Omitted → the final report only *offers* the command (one line), so E2E stays token-lean by default.
 
 ---
 
@@ -55,11 +56,27 @@ The following instructions defeat the orchestrator pattern. The orchestrator wil
 - Restating ScaffoldPhase or ExecPhase steps. The orchestrator reads them itself.
 - Critical-risk notes that are already in `Phase_<N>_context_summary.md` or task JSONs. The orchestrator reads those.
 
-### Nested-Dispatch Pre-flight
+### Nested-Dispatch capability (resolved in Step 0)
 
-Before the first phase dispatch in any E2E run, perform a one-shot nesting test: dispatch an `autviam-spec-reviewer` agent from a throwaway orchestrator dispatch, with a minimal "echo PASS" prompt and a synthetic task JSON path. If it returns cleanly, nested dispatch works in this environment — proceed. If it fails, halt E2E with a clear report and ask the user to fix the underlying issue (agent file install path, frontmatter `tools:` declaration including `Agent`/`Task`, hooks blocking nested dispatch, settings.json rules) before re-trying. **Do not paper over a nesting failure with inline instructions to the orchestrator** — that silently degrades the architecture without telling you why.
+The orchestrator pattern requires **two** levels of dispatch: the main agent dispatches the orchestrator (level 1), which dispatches implementers + reviewers (level 2). Many environments — including stock Claude Code — forbid level 2 (a subagent cannot spawn subagents). So E2E resolves a `nested_dispatch` mode in Step 0 and **branches**, rather than assuming nesting works:
+
+- **`off`** (default for Claude Code) — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase.
+- **`on`** — use the `autviam-phase-orchestrator` subagent per phase (Step 3a, orchestrator branch).
+- **`auto`** — run one minimal nesting probe: dispatch `autviam-spec-reviewer` with an "echo PASS" prompt from a throwaway orchestrator dispatch. Success → `on`; failure → fall back to `off`.
+
+Set the mode in `autviam_config.json` → `nested_dispatch`. **There is no "halt and fix" path** — a missing nesting capability is a platform limit, not a config bug, so E2E degrades to the inline path instead of dead-ending.
 
 ---
+
+## Step 0 — Capability gate
+
+Read `<skill_root>/autviam_config.json` → `nested_dispatch` (default `"off"` if the key or file is absent). Resolve the run mode:
+
+- `"off"` → **inline mode**. No orchestrator, no probe.
+- `"on"` → **orchestrator mode**.
+- `"auto"` → run the one-shot nesting probe (§ Nested-Dispatch capability); success → orchestrator mode, failure → inline mode.
+
+Record the resolved mode — Step 3 branches on it. This runs **before** Plan-2-Tasks so no decomposition work is wasted discovering that nesting is unavailable.
 
 ## Step 1 — Plan-2-Tasks (once, in main)
 
@@ -81,7 +98,11 @@ If `--stop-after <N>` (count): keep the full run list — the count is applied d
 
 For each phase in the run list:
 
-### 3a. Dispatch the orchestrator
+### 3a. Run the phase (branch on the Step 0 mode)
+
+**Inline mode (`off`, default in Claude Code):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. The implementer and Gate A/B reviewers dispatch as single-level subagents. There is no dispatch prompt and no orchestrator; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
+
+**Orchestrator mode (`on`):** dispatch the phase to a subagent:
 
 ```
 Agent(
@@ -91,11 +112,13 @@ Agent(
 )
 ```
 
-Fall back to dispatching the Task tool with the orchestrator's system prompt inlined if the named subagent isn't installed — but note that the install issue is itself a precondition to fix.
+Fall back to dispatching the Task tool with the orchestrator's system prompt inlined if the named subagent isn't installed.
 
-### 3b. Parse the return
+### 3b. Read the phase result
 
-The orchestrator's last fenced JSON block is the structured result. Extract `status`, `tasks_done`, `capped_tasks`, `handoff_path`, `summary_line`. Show the user the `summary_line` and the prose preceding the JSON (3–5 lines). That's all the per-phase detail the main context absorbs.
+**Orchestrator mode:** the orchestrator's last fenced JSON block is the structured result. Extract `status`, `tasks_done`, `capped_tasks`, `handoff_path`, `summary_line`. Show the user the `summary_line` and the 3–5 prose lines preceding the JSON — that's all the per-phase detail the main context absorbs.
+
+**Inline mode:** ExecPhase ran in the main thread, so its status (`completed` / `gate-cap-hit` / `blocked-by-precondition` / `failed`), the tasks done/capped, and the handoff path are already available directly — no JSON parsing. Summarize them for the user the same way.
 
 ### 3c. Branch on status
 
@@ -106,6 +129,8 @@ The orchestrator's last fenced JSON block is the structured result. Extract `sta
 | `blocked-by-precondition` | Stop. Surface to user — quote any `offending_instruction` if present. The precondition must be fixed before re-trying. |
 | `failed` | Stop. Surface the `error` field. |
 
+**Inline-mode note:** there is no orchestrator to re-dispatch. On `gate-cap-hit`, ExecPhase's own Step 7 surfaces the options and resumes in place per the user's choice; the loop continues with the same `completed` / cap-stop outcomes. The `resume_mode` round-trip in § Gate-Cap Bounce-Back applies to **orchestrator mode only**.
+
 ## Step 4 — Final report
 
 Present to the user:
@@ -115,6 +140,19 @@ Present to the user:
 - Stop reason: one of `all-phases-done`, `stop-after-target-reached`, `gate-cap-stop`, `precondition-blocked`, `failure`, `permission-denied`, `dirty-working-tree`, `scaffold-flag`, `nested-dispatch-unavailable`
 - Plan overview issue URL (visibility)
 - Resume command: `/AutViam e2e <plan_file>` if there's more to do, or "plan complete"
+
+### Architecture snapshot (only when stop reason is `all-phases-done`)
+
+The plan is fully implemented, so its feature architecture is now worth capturing as a planning asset:
+
+- If `--arch` was passed: run `commands/Architecture.md` in `--feature` mode against `<plan_file>` (writes `dev/architecture/<plan_slug>.html` + `.md` digest). Report the two paths.
+- Otherwise: print the offer verbatim, and stop there — don't render it inline (keeps the main thread lean):
+
+  ```
+  Snapshot the implemented architecture (durable + planning digest):  /AutViam arch --feature <plan_file>
+  ```
+
+Skip this section entirely for any other stop reason — a partial run isn't a feature to snapshot yet.
 
 ---
 
@@ -129,7 +167,7 @@ When `--stop-after` is omitted, the run continues automatically across phases. T
 5. **Permission denial** — if any `gh` / `git` / MCP write command is denied, surface the denied command and stop. Do not retry.
 6. **Dirty working tree at branch checkout** — if `git checkout -b <phase_branch>` would lose uncommitted work, stop and ask.
 7. **Scaffold flag** — if ScaffoldPhase marks a task `needs-human-review` on a critical field (`objective`, `acceptance_criteria`, `implementation_steps`, `deliverables`), stop and ask. Non-critical flags do not pause.
-8. **Nested dispatch unavailable** — pre-flight or live failure of subagent dispatch. Stop and ask.
+8. **Nested dispatch unavailable (auto mode only)** — the Step 0 probe failed. E2E falls back to inline mode automatically and continues; it does **not** stop. (In `off` mode there is no probe; in `on` mode a live orchestrator-dispatch failure surfaces as `failed` per trigger 3.)
 
 For triggers 2–8 the loop halts at the current phase boundary and surfaces the relevant context to the user. Resume is via re-invoking `/AutViam e2e <plan_file>` after the user resolves the issue.
 

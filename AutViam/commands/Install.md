@@ -102,6 +102,8 @@ Write `<skill_root>/autviam_config.json` using the confirmed choices:
   "schema_version": "1",
   "installed_at": "<ISO-date>",
   "repo": "<owner/repo or 'local'>",
+  "nested_dispatch": "off",
+  "project": "disable",
   "domain_reviewer": {
     "specialists": [
       {
@@ -136,6 +138,8 @@ ExecPhase/ExecTask pick up the config automatically — no restart needed.
 
 ## Notes
 
+- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread (correct for Claude Code, which forbids nested subagent dispatch); `"on"` uses the orchestrator subagent; `"auto"` probes once and falls back to `"off"`. Leave it `"off"` unless you've confirmed this environment allows a subagent to spawn subagents. See `commands/E2E.md` § Step 0.
+- **`project`** (default `"disable"`) turns on native GitHub Project sync: set it to a board name (or `{owner,name}` / `{owner,number}`) and AutViam adds plan/phase issues to that Project and keeps their Status field in step with the issue lifecycle. `"disable"` (or absent) = no Project calls at all. See `references/project_sync.md`.
 - The config is repo-local. It is never pushed upstream to the AutViam skill definition.
 - Trigger matching at runtime uses `git diff --name-only | grep -E '<pattern>'` —
   deterministic bash, not LLM judgment.

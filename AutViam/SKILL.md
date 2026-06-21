@@ -22,8 +22,16 @@ Parse the first token of `$@` and read the matching command file from `commands/
 | `tasks <plan_file> [tasks_folder] [tracking_file]` | `commands/Plan-2-Tasks.md` |
 | `scaffold <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ScaffoldPhase.md` |
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
+| `phase <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/Phase.md` |
+| `close-phase <phase_id> [plan_file] [tasks_folder]` | `commands/ClosePhase.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
 | `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks]` | `commands/E2E.md` |
+| `gen-plan <feature request>` | `commands/GenPlan.md` |
+| `fact-check [target]` | `commands/FactCheck.md` |
+| `plan-review <plan_file> [codebase]` | `commands/PlanReview.md` |
+| `diff-review [scope]` | `commands/DiffReview.md` |
+| `arch <path...>` / `arch --feature <plan_file>` (alias `architecture`) | `commands/Architecture.md` |
+| `explain <symbol\|file\|flow\|concept>` | `commands/Explain.md` |
 | `install [--dry-run]` | `commands/Install.md` |
 
 Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer Agents). On-demand references live in `references/`.
@@ -67,6 +75,8 @@ Single bridge file at `<tasks_folder>/github_issue_map.json`:
 
 Plan-2-Tasks creates this. Subsequent commands read it. **There is no per-task issue layer** — tasks are tracked as checkboxes inside the phase issue body. This is the single largest cost reduction vs Aut_Faciam.
 
+**Project sync (gated):** when `autviam_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7h appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
+
 ### Label Taxonomy (names only — colors and creation live in Plan-2-Tasks § 7a)
 `plan:<slug>`, `plan-issue`, `phase-issue`, `not-scaffolded`, `scaffolded`, `phase-N`, `in-progress`, `done`, `gate-cap-hit`.
 
@@ -87,6 +97,8 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/recovery.md` — rollback procedure for unrecoverable tasks/branches. Read only on repeated Gate C failure or gate cap.
 - `references/issue_body_updates.md` — canonical fetch→Write→Edit→push pattern for GitHub issue body mutations. Read when first touching an issue body in a session.
 - `references/failure_modes.md` — failure-mode taxonomy for gate entries. Read when first writing a gate failure entry.
+- `references/report_shell.md` — the one frozen HTML shell every report (`gen-plan` companion, `plan-review`, `diff-review`, `fact-check`, `arch`, `explain`) renders into. Read once per session, the first time you build a report.
+- `references/mermaid_module.md` — opt-in zoom/pan Mermaid topology block, theme-wired to the frozen shell. Read when a report (`arch`, `explain`, or a flow in `plan-review`/`diff-review`) needs a diagram with real edges.
 
 ### Subagents
 Three named Claude Code subagents are defined in `agents/`:

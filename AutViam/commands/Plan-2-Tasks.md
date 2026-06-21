@@ -136,6 +136,18 @@ No `task_issue` field — phase-issues-only.
 mkdir -p <tasks_folder>/gates
 ```
 
+### 7h. Project sync (gated — only if `autviam_config.json` → `project` is set)
+
+If project sync is armed, read `references/project_sync.md`, then add the overview issue and each phase issue to the board and set their fields:
+
+```bash
+.claude/scripts/update_tracker.sh add <issue-url>            # → item id
+.claude/scripts/update_tracker.sh set <issue-url> Plan  <slug>
+.claude/scripts/update_tracker.sh set <issue-url> Phase <N>   # phase issues only
+```
+
+The built-in **Repository** field auto-populates — no Repo set needed. Append a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to `github_issue_map.json` so Scaffold/ExecPhase reuse the item ids. If `project` is `"disable"`/absent, skip this step entirely — same degrade-gracefully rule as 7a's `gh auth` pre-check.
+
 ---
 
 Done. The plan is decomposed, tracked, and visible on GitHub at the phase level. ScaffoldPhase is the next step for any phase you want to execute.

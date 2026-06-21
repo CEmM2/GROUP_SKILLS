@@ -1,0 +1,193 @@
+/* report_theme.css — AutViam's single frozen report theme.
+   Pinned copy of AKMS dev/demos/_assets/theme.css (the 'Seuss' theme).
+   Pinned: 2026-06-21. Do NOT auto-track upstream — re-pin deliberately.
+   Used by every AutViam report command via references/report_shell.md. */
+
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Patrick+Hand&display=swap');
+
+/* ========== SHARED SEUSS PERSONALITY ========== */
+:root {
+  --font-main: 'Baloo 2', 'Patrick Hand', cursive, sans-serif;
+  --font-mono: 'Patrick Hand', 'Baloo 2', monospace;
+  --radius: 16px;
+  --radius-card: 20px;
+  --card-border-width: 2.5px;
+}
+
+/* ========== DARK SEUSS ========== */
+[data-theme="dark"] {
+  --bg: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2128;
+  --bg-input: #0d1117;
+  --border: #484f58;
+  --text: #c9d1d9;
+  --text-bright: #f0f6fc;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-bg: #1f6feb22;
+  --accent-border: #1f6feb55;
+  --green: #56d364;
+  --green-bg: #23863622;
+  --green-border: #23863655;
+  --red-btn: #E63B2E;
+  --purple: #bc8cff;
+  --purple-bg: #8957e522;
+  --purple-border: #8957e555;
+  --orange: #f0883e;
+  --orange-bg: #f0883e22;
+  --orange-border: #f0883e55;
+  --red: #f85149;
+  --yellow: #d29922;
+  --diff-add-bg: #23863618;
+  --diff-del-bg: #f8514918;
+  --pill-bg: #21262d;
+  --count-bg: #30363d;
+  --card-shadow: 3px 4px 0px #000000;
+  --card-shadow-hover: 5px 6px 0px #000000;
+  --card-shadow-selected: 5px 6px 0px var(--accent);
+  --topbar-bg: #161b22;
+  --topbar-accent: #E63B2E;
+  --topbar-shadow: 0 3px 0 #E63B2E;
+  --topbar-text: #f0f6fc;
+  --btn-shadow: 2px 2px 0 #000000;
+  --sidebar-stripe: #E63B2E11;
+  --dot-border: #58a6ff44;
+  --toggle-icon: "☀️";
+}
+
+/* ========== LIGHT SEUSS ========== */
+[data-theme="light"] {
+  --bg: #FFF8E7;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FFF0CC;
+  --bg-input: #FFFFFF;
+  --border: #E8B84B;
+  --text: #2B2B2B;
+  --text-bright: #1A1A1A;
+  --text-muted: #6B5B3E;
+  --accent: #2B78C4;
+  --accent-bg: #2B78C422;
+  --accent-border: #2B78C455;
+  --green: #4CAF50;
+  --green-bg: #4CAF5022;
+  --green-border: #4CAF5055;
+  --red-btn: #E63B2E;
+  --purple: #9C27B0;
+  --purple-bg: #9C27B022;
+  --purple-border: #9C27B044;
+  --orange: #FF8C00;
+  --orange-bg: #FF8C0022;
+  --orange-border: #FF8C0044;
+  --red: #E63B2E;
+  --yellow: #E8B84B;
+  --diff-add-bg: #4CAF5018;
+  --diff-del-bg: #E63B2E18;
+  --pill-bg: #FFF0CC;
+  --count-bg: #FFE4A0;
+  --card-shadow: 3px 4px 0px #2B2B2B;
+  --card-shadow-hover: 5px 6px 0px #2B2B2B;
+  --card-shadow-selected: 5px 6px 0px var(--accent);
+  --topbar-bg: #E63B2E;
+  --topbar-accent: #E63B2E;
+  --topbar-shadow: 0 3px 0 #B22E24;
+  --topbar-text: #FFFFFF;
+  --btn-shadow: 2px 2px 0 #2B2B2B;
+  --sidebar-stripe: #E63B2E22;
+  --dot-border: #2B2B2B;
+  --toggle-icon: "🌙";
+}
+
+/* ========== BASE STYLES ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-main);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background 0.35s, color 0.35s;
+}
+
+/* ========== BADGE SYSTEM ========== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+  font-family: var(--font-main);
+  border: 1.5px solid transparent;
+  transition: all 0.35s;
+}
+
+.badge.repo {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.badge.scope {
+  background: var(--purple-bg);
+  color: var(--purple);
+  border-color: var(--purple-border);
+}
+
+.badge.domain {
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: var(--green-border);
+}
+
+.badge.version {
+  background: var(--count-bg);
+  color: var(--text-muted);
+}
+
+.badge.invocable {
+  background: var(--orange-bg);
+  color: var(--orange);
+  border-color: var(--orange-border);
+}
+
+.badge.size {
+  background: var(--count-bg);
+  color: var(--text-muted);
+}
+
+/* ========== DRIFT DOTS ========== */
+.drift-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.drift-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--dot-border);
+}
+
+.drift-dot.synced {
+  background: var(--green);
+}
+
+.drift-dot.minor {
+  background: var(--yellow);
+}
+
+.drift-dot.diverged {
+  background: var(--red);
+}

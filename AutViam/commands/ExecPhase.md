@@ -163,7 +163,7 @@ When `gate_<x>_failures == 4` for a task:
 1. **Mark the task in the gates file:** add a `## STATUS: gate-cap-hit on Gate <X>` block with the three failure entries summarized.
 2. **Update the task JSON:** `"status": "gate-cap-hit"`, leave other completion fields untouched.
 3. **Update the tracker:** mark this row `gate-cap-hit` with a link to the gates entry.
-4. **GitHub:** add `gate-cap-hit` label to the **phase issue** (1 `gh` call). Do not edit the body or close anything yet.
+4. **GitHub:** add `gate-cap-hit` label to the **phase issue** (1 `gh` call). Do not edit the body or close anything yet. **Project sync (gated):** if armed, also `set Status=Blocked` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled.
 5. **Stop dispatching new tasks.** Set an internal `stop_new_dispatches` flag.
 6. **Wait for all in-flight parallel tasks to finish their current gate sequence.** They may themselves hit the cap — log each one the same way. Do not cancel them; let them complete (pass or cap).
 7. **Once all parallel tasks have settled, surface the stop report and ask the user:**
@@ -231,22 +231,6 @@ When all tasks in `<phase_id>` are done (or the user has chosen to continue past
 
 Generate `<tasks_folder>/Handoff_Phase_<phase_id+1>.md` from `templates/Handoff_template.md`. On the final phase, generate it as a project completion summary; skip the "edit next phase issue" implication.
 
-Populate the `Session Reset Packet` from `gates/phase_<phase_id>_gates.md` and each task JSON:
-
-- Include every task in the phase, including `done`, `skipped`, and `gate-cap-hit`.
-- `Gate A Score` is the final Gate A reviewer score for the task. If Gate A was not reached, use `not-run`.
-- `Gate B Score` is the final Gate B reviewer score for the task. If Gate B was not reached, use `not-run`.
-- `Gate C` is the final task-relevant test count from Gate C, or `not-run`.
-- `Decision` is a short recommendation for the next session: `accept`, `fix now`, `defer`, or `retry`.
-
-Below the table, add one concise `Gate Findings` bullet per task:
-
-- Gate A sentence: summarize the final actionable finding, or write `clean pass; no actionable findings`.
-- Gate B sentence: summarize the final actionable finding, or write `clean pass; no actionable findings`.
-- Recommended action sentence: explain the decision in one short sentence.
-
-Keep this section compact. It is a session-reset aid, not a full report; detailed evidence stays in the gates file and task reports.
-
 ### 10b. Batched phase-issue update (1 fetch + 1 push, 1 `MultiEdit`)
 
 Per `references/issue_body_updates.md`:
@@ -256,6 +240,12 @@ Per `references/issue_body_updates.md`:
 3. `MultiEdit`: for each task ID in `completed_this_phase`, replace `- [ ] <task_id>` → `- [x] <task_id>` (one MultiEdit call, N edits)
 4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md --remove-label "in-progress" --add-label "done" --state closed` — body update, label swap, and close in one call.
 
+**Project sync (gated):** if armed, `set Status=Done` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled:
+```bash
+.claude/scripts/update_tracker.sh set <phase_issue_url> Status Done
+```
+(The `phase-close.sh` PostToolUse backstop also performs this set when 10b's in-band call is skipped — they're idempotent.)
+
 ### 10c. Plan overview checkbox
 
 Per `references/issue_body_updates.md`:
@@ -264,6 +254,8 @@ Per `references/issue_body_updates.md`:
 2. `Write` tool: `/tmp/overview_body.md`
 3. `Edit` tool: `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`
 4. `Bash`: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`
+
+**Project sync (gated, final phase only):** on the last phase, also `set Status=Done` on the overview item (`references/project_sync.md`).
 
 **Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
 
