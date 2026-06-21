@@ -22,8 +22,16 @@ Parse the first token after the user's `AutViam_C` or `$AutViam_C` invocation an
 | `tasks <plan_file> [tasks_folder] [tracking_file]` | `commands/Plan-2-Tasks.md` |
 | `scaffold <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ScaffoldPhase.md` |
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
+| `phase <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/Phase.md` |
+| `close-phase <phase_id> [plan_file] [tasks_folder]` | `commands/ClosePhase.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
-| `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks]` | `commands/E2E.md` |
+| `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks] [--arch]` | `commands/E2E.md` |
+| `gen-plan <feature request>` | `commands/GenPlan.md` |
+| `fact-check [target]` | `commands/FactCheck.md` |
+| `plan-review <plan_file> [codebase]` | `commands/PlanReview.md` |
+| `diff-review [scope]` | `commands/DiffReview.md` |
+| `arch <path...>` / `arch --feature <plan_file>` (alias `architecture`) | `commands/Architecture.md` |
+| `explain <symbol\|file\|flow\|concept>` | `commands/Explain.md` |
 | `install [--dry-run]` | `commands/Install.md` |
 
 Templates live in `templates/`. Codex agent prompt profiles live in `agents/` (see § Codex Agent Profiles). On-demand references live in `references/`.
@@ -91,6 +99,9 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/recovery.md` — rollback procedure for unrecoverable tasks/branches. Read only on repeated Gate C failure or gate cap.
 - `references/issue_body_updates.md` — canonical fetch→Write→Edit→push pattern for GitHub issue body mutations. Read when first touching an issue body in a session.
 - `references/failure_modes.md` — failure-mode taxonomy for gate entries. Read when first writing a gate failure entry.
+- `references/report_shell.md` — the one frozen HTML shell every report (`gen-plan` companion, `plan-review`, `diff-review`, `fact-check`, `arch`, `explain`) renders into. Read once per session, the first time you build a report.
+- `references/mermaid_module.md` — opt-in zoom/pan Mermaid topology block, theme-wired to the frozen shell. Read when a report (`arch`, `explain`, or a flow in `plan-review`/`diff-review`) needs a diagram with real edges.
+- `references/project_sync.md` — gated GitHub Project board sync mechanics (active only when `autviam_c_config.json` → `project` names a board). Read when wiring or refreshing Project item status.
 
 ### Codex Agent Profiles
 Three bundled Codex prompt profiles are defined in `agents/`:

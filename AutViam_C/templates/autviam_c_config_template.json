@@ -3,6 +3,8 @@
   "schema_version": "2-codex",
   "installed_at": "YYYY-MM-DD",
   "repo": "owner/repo-or-local",
+  "_nested_dispatch_comment": "off | on | auto — see commands/E2E.md § Nested-Dispatch capability. Default off = inline phase loop, always works (a Codex worker never has to spawn nested agents).",
+  "nested_dispatch": "off",
   "domain_reviewer": {
     "specialists": [
       {
