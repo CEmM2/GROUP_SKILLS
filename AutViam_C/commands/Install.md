@@ -148,6 +148,25 @@ Re-run 'AutViam_C install' any time to update.
 ExecPhase/ExecTask pick up the config automatically — no restart needed.
 ```
 
+## Step 6 — Install the project-tracker helper
+
+Copy the bundled `update_tracker.sh` helper into the host repo so the GitHub Project sync path has an executable to call. This is the single script that `references/project_sync.md`, Plan-2-Tasks §7h, ScaffoldPhase, and ExecPhase invoke when Project sync is armed.
+
+```bash
+mkdir -p .codex/scripts
+if [ -e .codex/scripts/update_tracker.sh ]; then
+  # Don't clobber a repo-customized helper — drop a .new alongside for the user to diff.
+  cp <skill_root>/scripts/update_tracker.sh .codex/scripts/update_tracker.sh.new
+  echo "update_tracker.sh already present — wrote .codex/scripts/update_tracker.sh.new instead (diff and merge manually)."
+else
+  cp <skill_root>/scripts/update_tracker.sh .codex/scripts/update_tracker.sh
+  chmod +x .codex/scripts/update_tracker.sh
+  echo "Installed .codex/scripts/update_tracker.sh"
+fi
+```
+
+The copy itself is plain shell (`cp`/`chmod`); only the `autviam_c_config.json` JSON in Step 5 is written with Codex file-editing tools. The helper is **best-effort / no-op unless armed**: it only does anything when this repo's `autviam_c_config.json` → `project` names a board (and `gh` is authenticated). When `project` is absent or `"disable"`, nothing calls it, and even when armed it degrades gracefully — an unauthenticated `gh` or an unresolvable field logs to stderr and exits non-zero without ever blocking a phase. Installing it now just means the executable is in place for the day you flip `project` on.
+
 ## Runtime Notes
 
 - Codex does not install custom named agents globally. Prompt profiles remain markdown files and are loaded into built-in `explorer` or `worker` agents at dispatch time.

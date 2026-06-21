@@ -35,7 +35,7 @@ Tick the phase's checkbox in the plan-overview body per `references/issue_body_u
 If the `project` block is present (project sync armed — see `references/project_sync.md`), set the phase item's Status to Done; on the final phase, also set the overview item Done:
 
 ```bash
-.claude/scripts/update_tracker.sh set <phase_issue_url> Status Done
+.codex/scripts/update_tracker.sh set <phase_issue_url> Status Done
 ```
 
 Best-effort — skip silently if project sync is disabled or the helper is absent.

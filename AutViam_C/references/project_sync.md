@@ -17,13 +17,13 @@ Resolve a name to a number once: `gh project list --owner <owner> --format json`
 
 ## The executable: `update_tracker.sh`
 
-All adds/sets go through the repo helper `.claude/scripts/update_tracker.sh`, which resolves and caches the project/field/option IDs so each call is one `gh project item-edit`:
+All adds/sets go through the repo helper `.codex/scripts/update_tracker.sh`, which resolves and caches the project/field/option IDs so each call is one `gh project item-edit`:
 
 ```bash
-.claude/scripts/update_tracker.sh add <issue-or-pr-url>            # prints the new item id
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Plan   <slug>
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Phase  <N>
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Status Done
+.codex/scripts/update_tracker.sh add <issue-or-pr-url>            # prints the new item id
+.codex/scripts/update_tracker.sh set <issue-or-pr-url> Plan   <slug>
+.codex/scripts/update_tracker.sh set <issue-or-pr-url> Phase  <N>
+.codex/scripts/update_tracker.sh set <issue-or-pr-url> Status Done
 ```
 
 If the helper is absent in the host repo, fall back to raw `gh project item-add` / `gh project item-edit --id <itemId> --project-id <pid> --field-id <fid> ...` with IDs resolved per the gate above.

@@ -164,7 +164,7 @@ When `gate_<x>_failures == 4` for a task:
 1. **Mark the task in the gates file:** add a `## STATUS: gate-cap-hit on Gate <X>` block with the three failure entries summarized.
 2. **Update the task JSON:** `"status": "gate-cap-hit"`, leave other completion fields untouched.
 3. **Update the tracker:** mark this row `gate-cap-hit` with a link to the gates entry.
-4. **GitHub:** add `gate-cap-hit` label to the **phase issue** (1 `gh` call). Do not edit the body or close anything yet.
+4. **GitHub:** add `gate-cap-hit` label to the **phase issue** (1 `gh` call). Do not edit the body or close anything yet. **Project sync (gated):** if armed, also `set Status=Blocked` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled.
 5. **Stop dispatching new tasks.** Set an internal `stop_new_dispatches` flag.
 6. **Wait for all in-flight parallel tasks to finish their current gate sequence.** They may themselves hit the cap — log each one the same way. Do not cancel them; let them complete (pass or cap).
 7. **Once all parallel tasks have settled, surface the stop report and ask the user:**
@@ -257,6 +257,11 @@ Per `references/issue_body_updates.md`:
 3. In the temp file, replace `- [ ] <task_id>` → `- [x] <task_id>` for each task ID in `completed_this_phase`.
 4. Shell: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md --remove-label "in-progress" --add-label "done" --state closed` — body update, label swap, and close in one call.
 
+**Project sync (gated):** if armed, `set Status=Done` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled:
+```bash
+.codex/scripts/update_tracker.sh set <phase_issue_url> Status Done
+```
+
 ### 10c. Plan overview checkbox
 
 Per `references/issue_body_updates.md`:
@@ -265,6 +270,8 @@ Per `references/issue_body_updates.md`:
 2. Materialise the captured body to `/tmp/overview_body.md` with a Codex file-editing tool.
 3. In the temp file, replace `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`
 4. Shell: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`
+
+**Project sync (gated, final phase only):** on the last phase, also `set Status=Done` on the overview item (`references/project_sync.md`).
 
 **Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
 

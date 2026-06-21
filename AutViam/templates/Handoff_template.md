@@ -29,6 +29,27 @@
 
 ---
 
+## Session Reset Packet
+
+> Use this after clearing the Codex/Claude session. It should be short enough to read first,
+> but specific enough to decide whether a task should be fixed now, deferred, or retried
+> by an agent with extra instructions.
+
+**Next command:** `/AutViam scaffold <phase_id+1> <plan_file>` or `/AutViam exec <phase_id+1> <plan_file>`
+
+| Task ID | Title | Status | Gate A Score | Gate B Score | Gate C | Decision |
+|---------|-------|--------|--------------|--------------|--------|----------|
+|         |       | done / skipped / gate-cap-hit | 10/10 | 9/10 | pass/total | fix now / defer / retry / accept |
+
+### Gate Findings
+
+- **<task_id> — <title>**
+  - **Gate A:** <score>/10. <1 sentence: spec compliance finding, or "clean pass; no actionable findings.">
+  - **Gate B:** <score>/10. <1 sentence: domain/code-quality finding, or "clean pass; no actionable findings.">
+  - **Recommended action:** <fix now | defer | retry with instructions | accept>. <short reason.>
+
+---
+
 ## Architecture and State After Phase <phase_id>
 
 > What the codebase looks like NOW. The next agent must understand this before touching anything.

@@ -170,7 +170,13 @@ Push the body and swap labels in a single call:
 gh issue edit <phase_issue> --remove-label "not-scaffolded" --add-label "scaffolded" --body-file /tmp/phase_<N>_body.md
 ```
 
-**Total `gh` budget for Step 8: 1 call** (vs N+2 in Aut_Faciam).
+**Project sync (gated):** if `autviam_c_config.json` → `project` is set, also set the phase item's Status to `Todo` (see `references/project_sync.md`) — best-effort, skip if project is disabled:
+
+```bash
+.codex/scripts/update_tracker.sh set <phase_issue_url> Status Todo
+```
+
+**Total `gh` budget for Step 8: 1 call** (+1 best-effort project call when armed; vs N+2 in Aut_Faciam).
 
 ---
 

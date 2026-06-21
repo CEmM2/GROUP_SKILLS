@@ -136,6 +136,33 @@ Re-run '/AutViam install' any time to update.
 ExecPhase/ExecTask pick up the config automatically — no restart needed.
 ```
 
+## Step 6 — Install the project-tracker helper (deterministic)
+
+Copy the bundled `update_tracker.sh` helper into the host repo so the GitHub Project
+sync path has an executable to call. This is the single script that
+`references/project_sync.md`, Plan-2-Tasks §7h, ScaffoldPhase, and ExecPhase invoke
+when Project sync is armed.
+
+```bash
+mkdir -p .claude/scripts
+if [ -e .claude/scripts/update_tracker.sh ]; then
+  # Don't clobber a repo-customized helper — drop a .new alongside for the user to diff.
+  cp <skill_root>/scripts/update_tracker.sh .claude/scripts/update_tracker.sh.new
+  echo "update_tracker.sh already present — wrote .claude/scripts/update_tracker.sh.new instead (diff and merge manually)."
+else
+  cp <skill_root>/scripts/update_tracker.sh .claude/scripts/update_tracker.sh
+  chmod +x .claude/scripts/update_tracker.sh
+  echo "Installed .claude/scripts/update_tracker.sh"
+fi
+```
+
+The helper is **best-effort / no-op unless armed**: it only does anything when this repo's
+`autviam_config.json` → `project` names a board (and `gh` is authenticated). With
+`project: "disable"` (the default) nothing calls it, and even when armed it degrades
+gracefully — an unauthenticated `gh` or an unresolvable field logs to stderr and exits
+non-zero without ever blocking a phase. Installing it now just means the executable is in
+place for the day you flip `project` on.
+
 ## Notes
 
 - **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread (correct for Claude Code, which forbids nested subagent dispatch); `"on"` uses the orchestrator subagent; `"auto"` probes once and falls back to `"off"`. Leave it `"off"` unless you've confirmed this environment allows a subagent to spawn subagents. See `commands/E2E.md` § Step 0.

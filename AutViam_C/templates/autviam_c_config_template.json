@@ -5,6 +5,8 @@
   "repo": "owner/repo-or-local",
   "_nested_dispatch_comment": "off | on | auto — see commands/E2E.md § Nested-Dispatch capability. Default off = inline phase loop, always works (a Codex worker never has to spawn nested agents).",
   "nested_dispatch": "off",
+  "_project_help": "'disable' (default) = no GitHub Project sync. Otherwise a board: \"Project Name\" (owner defaults to repo owner), or {\"owner\":\"X\",\"name\":\"...\"} / {\"owner\":\"X\",\"number\":N}.",
+  "project": "disable",
   "domain_reviewer": {
     "specialists": [
       {

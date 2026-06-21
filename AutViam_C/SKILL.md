@@ -79,6 +79,8 @@ Single bridge file at `<tasks_folder>/github_issue_map.json`:
 
 Plan-2-Tasks creates this. Subsequent commands read it. **There is no per-task issue layer** — tasks are tracked as checkboxes inside the phase issue body. This is the single largest cost reduction vs Aut_Faciam.
 
+**Project sync (gated):** when `autviam_c_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7h appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
+
 ### Label Taxonomy (names only — colors and creation live in Plan-2-Tasks § 7a)
 `plan:<slug>`, `plan-issue`, `phase-issue`, `not-scaffolded`, `scaffolded`, `phase-N`, `in-progress`, `done`, `gate-cap-hit`.
 
