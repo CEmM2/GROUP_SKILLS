@@ -41,9 +41,10 @@ Templates live in `templates/`. Codex agent prompt profiles live in `agents/` (s
 ## Shared Architecture
 
 ### Folder Conventions
-- `<tasks_folder>` defaults to `dev/tasks/<plan_file_stem>/`
-- `<tracking_file>` defaults to `dev/tracking/tasks-tracker_<plan_file_stem>.md`
+- `<tasks_folder>` defaults to `dev/plans/<plan_file_stem>/` — the per-plan home for all derived artifacts (task JSONs, context summaries, tracker, gates, reviews, issue map, handoffs). The plan markdown itself stays at `dev/plans/<plan_file_stem>.md`, beside this folder.
+- `<tracking_file>` defaults to `<tasks_folder>/tasks-tracker.md`
 - `<gates_folder>` is always `<tasks_folder>/gates/`
+- `<reviews_folder>` is always `<tasks_folder>/reviews/` — rendered review reports (`plan-review`, and `diff-review` when run against a plan) land here instead of the transient `~/.agent/diagrams/`.
 
 ### Plan Reading Discipline (token discipline)
 - Plan-2-Tasks reads `<plan_file>` in full — once.

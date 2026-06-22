@@ -6,7 +6,7 @@ This tracker records execution status for the plan_name task set.
 ## plan_name Tracker
 
 Plan source: `dev/plans/planned/plan_name.md`
-Task index: `dev/tasks/plan_name/all-tasks.md`
+Task index: `dev/plans/plan_name/all-tasks.md`
 
 | Task ID | Title | Status | Owner | Blocked by (open) | Blocks | Plan lines | PR/Commit | Verified by | Completed on |
 |---|---|---|---|---|---|---|---|---|---|

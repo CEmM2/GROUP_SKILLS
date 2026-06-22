@@ -28,4 +28,4 @@ Before writing HTML, produce the **fact-sheet** per `commands/FactCheck.md` § i
 7. **Plan review** — the Good/Bad/Ugly/Questions `.gbu` block (see report_shell). Each item cites a plan section + code file. Empty category → "None found".
 8. **Understanding gaps** — roll up: count of changes with clear vs missing rationale, the cognitive-complexity flags, and explicit "document X before implementing" recommendations. Makes cognitive debt visible *before* work starts.
 
-Current = neutral/blue, planned additions = green/accent, concern = amber, gap/risk = red. Write to `~/.agent/diagrams/`, open it, tell the user the path.
+Current = neutral/blue, planned additions = green/accent, concern = amber, gap/risk = red. Write to the plan's `<reviews_folder>` (`dev/plans/<plan_file_stem>/reviews/`, derived from `<plan_file>`); open it and tell the user the path.

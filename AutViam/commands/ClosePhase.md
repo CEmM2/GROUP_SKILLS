@@ -4,7 +4,7 @@ Manually close a phase issue when the phase was finished **outside** ExecPhase S
 
 For the automated paths see ExecPhase Step 10 (in-band) and the `phase-close.sh` PostToolUse backstop (fires on the handoff write). This command is for the case where neither ran.
 
-**Inputs:** `<phase_id>` (required); `<plan_file>` or `<tasks_folder>` to locate `github_issue_map.json` (default `dev/tasks/<plan_file_stem>/`).
+**Inputs:** `<phase_id>` (required); `<plan_file>` or `<tasks_folder>` to locate `github_issue_map.json` (default `dev/plans/<plan_file_stem>/`).
 
 ---
 

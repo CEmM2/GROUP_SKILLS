@@ -2,7 +2,7 @@
 
 Convert a plan into granular tasks, set up tracking, and create the GitHub plan + phase issues.
 
-**Inputs:** `<plan_file>` (required); `<tasks_folder>` (default `dev/tasks/<plan_file_stem>/`); `<tracking_file>` (default `dev/tracking/tasks-tracker_<plan_file_stem>.md`).
+**Inputs:** `<plan_file>` (required); `<tasks_folder>` (default `dev/plans/<plan_file_stem>/`); `<tracking_file>` (default `<tasks_folder>/tasks-tracker.md`).
 
 ---
 
