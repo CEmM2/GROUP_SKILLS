@@ -132,17 +132,17 @@ The plan overview was created with `#<phase_issue_number>` placeholders. Replace
 
 No `task_issue` field — phase-issues-only.
 
-### 7g. Project sync (gated — only if `autviam_config.json` → `project` is set)
+### 7g. Project sync (gated)
 
-If project sync is armed, read `references/project_sync.md`, then add the overview issue and each phase issue to the board and set their fields:
+Add the overview issue and each phase issue to the GitHub Project board via `project_sync.sh` — one `add` for the overview, one per phase. The issue URL is `https://github.com/<repo>/issues/<number>`, built from `<repo>` and the issue numbers captured at creation (§7b/§7c):
 
 ```bash
-.claude/scripts/update_tracker.sh add <issue-url>            # → item id
-.claude/scripts/update_tracker.sh set <issue-url> Plan  <slug>
-.claude/scripts/update_tracker.sh set <issue-url> Phase <N>   # phase issues only
+<skill_root>/scripts/project_sync.sh add <tasks_folder>/github_issue_map.json <skill_root>/autviam_config.json overview https://github.com/<repo>/issues/<overview_issue> --slug <slug>
+# per phase <N>:
+<skill_root>/scripts/project_sync.sh add <tasks_folder>/github_issue_map.json <skill_root>/autviam_config.json phase:<N> https://github.com/<repo>/issues/<phase_issue> --slug <slug> --phase <N>
 ```
 
-The built-in **Repository** field auto-populates — no Repo set needed. Append a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to `github_issue_map.json` so Scaffold/ExecPhase reuse the item ids. If `project` is `"disable"`/absent, skip this step entirely — same degrade-gracefully rule as 7a's `gh auth` pre-check.
+`project_sync.sh` self-gates on `autviam_config.json` → `project` (returns OFF and no-ops when `"disable"`/absent), is idempotent (skips an item already cached in the map's `project` block), and is best-effort (logs + skips on any failure, never blocks). It resolves the board, sets Plan/Phase (the built-in **Repository** field auto-populates), and writes the `project` block (`owner`, `number`, `overview_item`, `phase_items`) into `github_issue_map.json` itself, so Scaffold/ExecPhase reuse the item ids — no manual board resolution or project-block authoring. Background: `references/project_sync.md`.
 
 ---
 

@@ -150,7 +150,7 @@ ExecPhase/ExecTask pick up the config automatically — no restart needed.
 
 ## Step 6 — Install the bundled scripts
 
-Copy the bundled helper scripts into the host repo at a stable repo-local path. The command files already invoke them from `<skill_root>/scripts/` (so they work even without this step); this copy also places them under `.codex/scripts/`, where `references/project_sync.md` expects `update_tracker.sh`. The set: `update_tracker.sh` (Project sync), `init_plan.sh` (slug/dirs/labels/issues/map), `issue_body.sh` (issue-body roundtrip), `gate_state.py` (gate counting + task-JSON writeback), `phase_git.sh` (branch + rollback), `match_specialists.sh` (config-driven specialist matching).
+Copy the bundled helper scripts into the host repo at a stable repo-local path. The command files already invoke them from `<skill_root>/scripts/` (so they work even without this step); this copy also places them under `.codex/scripts/`, where `references/project_sync.md` expects `update_tracker.sh`. The set: `project_sync.sh` (gated Project writer) + `update_tracker.sh` (the Project primitive it wraps), `init_plan.sh` (slug/dirs/labels/issues/map), `issue_body.sh` (issue-body roundtrip), `gate_state.py` (gate counting + task-JSON writeback), `phase_git.sh` (branch + rollback), `match_specialists.sh` (config-driven specialist matching).
 
 ```bash
 mkdir -p .codex/scripts

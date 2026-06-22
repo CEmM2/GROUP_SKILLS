@@ -42,7 +42,7 @@ Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer
 
 ### Bundled scripts
 
-Six helper scripts live at `<skill_root>/scripts/` and own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls). They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
+Seven helper scripts live at `<skill_root>/scripts/` and own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls). They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
 
 | Script | Owns |
 |---|---|
@@ -51,7 +51,8 @@ Six helper scripts live at `<skill_root>/scripts/` and own the **deterministic p
 | `gate_state.py` | Gate-file + task-JSON state: `init`/`init-task`, `count`/`cap-check`/`sync-counters` (the 3-failure cap, durable from the file), `complete`/`set-status`/`reset-task`, `last-good-sha`, `reset-packet`. |
 | `phase_git.sh` | Deterministic git sequences: `branch` (canonical name + dirty-tree guard), `revert` (reverse-order `git revert`, never `reset --hard`). |
 | `match_specialists.sh` | Config-driven specialist/skill matcher: emits the JSON array of `autviam_config.json` entries whose `trigger_patterns` hit the diff. Absent config/section → `[]`. |
-| `update_tracker.sh` | GitHub Project (board) sync — `add`/`set` item fields. Gated on `autviam_config.json` → `project` (see `references/project_sync.md`). |
+| `project_sync.sh` | The gated GitHub-Project writer (the high-level entry point): `resolve` (board OFF/owner+number), `add` (board item + Plan/Phase + `project`-block cache, idempotent), `status` (Status from the map). Self-gates on `autviam_config.json` → `project`; wraps `update_tracker.sh`. See `references/project_sync.md`. |
+| `update_tracker.sh` | Low-level Project primitive `project_sync.sh` calls — one `gh project item-edit` per `add`/`set`, IDs cached. Callers use `project_sync.sh`; this is the wrapped primitive. |
 
 ### Folder Conventions
 - `<tasks_folder>` defaults to `dev/plans/<plan_file_stem>/` — the per-plan home for all derived artifacts (task JSONs, context summaries, tracker, gates, reviews, issue map, handoffs). The plan markdown itself stays at `dev/plans/<plan_file_stem>.md`, beside this folder.

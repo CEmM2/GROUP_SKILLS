@@ -4,33 +4,43 @@ When `autviam_config.json` → `project` names a board, AutViam adds its plan/ph
 
 It rides the GitHub touchpoints AutViam already has (Plan-2-Tasks creates issues; Scaffold/ExecPhase swap labels). No new pipeline steps; ~1 extra `gh` call per touchpoint, only when armed.
 
-## Gate (resolve first)
+## The executable: `project_sync.sh`
 
-Read `<skill_root>/autviam_config.json` → `project`:
+Every Project touch goes through one script — `<skill_root>/scripts/project_sync.sh`. It is the high-level entry point that **owns the deterministic plumbing the LLM used to do by hand**: board resolution (the 4 config forms + name→number), the idempotency check, and the `project`-block bookkeeping in `github_issue_map.json`. It wraps the low-level `update_tracker.sh` primitive (one `gh project item-edit` per call, field/option IDs cached) and bridges the board config to it via `TRACKER_OWNER`/`TRACKER_NUMBER`.
 
-- absent or `"disable"` → **OFF**. Skip everything below.
-- `"Some Name"` → owner defaults to the repo owner (`gh repo view --json owner -q .owner.login`); resolve name → number.
-- `{ "owner": "...", "name": "..." }` → resolve name → number.
-- `{ "owner": "...", "number": N }` → use directly.
+It **self-gates**: when `project` is `"disable"` or absent it returns `OFF` and no-ops. It is idempotent and best-effort — every failure logs to stderr and exits non-zero **without blocking**; callers ignore the exit code.
 
-Resolve a name to a number once: `gh project list --owner <owner> --format json` → match `title`. Two boards sharing a title can't be resolved from a name alone — warn and skip (don't guess).
-
-## The executable: `update_tracker.sh`
-
-All adds/sets go through the repo helper `.claude/scripts/update_tracker.sh`, which resolves and caches the project/field/option IDs so each call is one `gh project item-edit`:
+Three subcommands:
 
 ```bash
-.claude/scripts/update_tracker.sh add <issue-or-pr-url>            # prints the new item id
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Plan   <slug>
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Phase  <N>
-.claude/scripts/update_tracker.sh set <issue-or-pr-url> Status Done
+# Resolve the board — "OFF" when disabled/absent, else "<owner> <number>".
+project_sync.sh resolve <config_path> [repo_owner]
+
+# Add an item to the board, set Plan (+ Phase for phases), cache the item id in the map.
+# which = overview | phase:<N>. Idempotent — skips if already cached in the project block.
+project_sync.sh add <map_file> <config_path> <which> <issue_url> [--slug S] [--phase N]
+
+# Set Status on the cached item (issue URL derived from the map).
+# which = overview | phase:<N>.
+project_sync.sh status <map_file> <which> <status>
 ```
 
-If the helper is absent in the host repo, fall back to raw `gh project item-add` / `gh project item-edit --id <itemId> --project-id <pid> --field-id <fid> ...` with IDs resolved per the gate above.
+`add` and `resolve` perform the board resolution and the `project`-block writeback automatically — the LLM no longer resolves boards or hand-writes the project block. If the underlying `update_tracker.sh` is absent or a field/option is missing, the wrapped call skips that set rather than erroring (degrade-gracefully).
 
-## Bridge block (cache in `github_issue_map.json`)
+## Gate (resolve first) — background
 
-Plan-2-Tasks writes a `project` block alongside the issue map so later phases skip re-resolution:
+`project_sync.sh` does this for you (`resolve`, and the gate inside `add`/`status`); this is the config vocabulary it reads from `<skill_root>/autviam_config.json` → `project`:
+
+- absent or `"disable"` → **OFF**. No Project calls.
+- `"Some Name"` → owner defaults to the repo owner (`gh repo view --json owner -q .owner.login`); name → number.
+- `{ "owner": "...", "name": "..." }` → name → number.
+- `{ "owner": "...", "number": N }` → used directly.
+
+Name → number resolution is `gh project list --owner <owner> --format json` → match `title`; two boards sharing a title can't be resolved from a name alone, so the script warns and skips (never guesses). The LLM does **not** run any of these `gh` calls itself anymore.
+
+## Bridge block (cached in `github_issue_map.json`) — background
+
+`project_sync.sh add` writes and maintains this `project` block so later phases skip re-resolution — the LLM no longer hand-writes it:
 
 ```json
 "project": {
@@ -40,23 +50,23 @@ Plan-2-Tasks writes a `project` block alongside the issue map so later phases sk
 }
 ```
 
-(`update_tracker.sh` caches the field/option IDs itself in a temp file, so they need not live in the map.)
+(`update_tracker.sh` caches the field/option IDs itself in a temp file, so they need not live in the map.) The idempotency check reads this block: `add overview` skips when `overview_item` is set, `add phase:<N>` skips when `phase_items[N]` is set.
 
 ## Lifecycle touchpoints (all gated, all best-effort)
 
-| AutViam step | Project action |
+| AutViam step | `project_sync.sh` call |
 |---|---|
-| Plan-2-Tasks, after creating each issue (§ 7h) | `add` item; `set Plan=<slug>`, `set Phase=<N>` (Repo auto-populates from the built-in **Repository** field); cache item ids |
-| ScaffoldPhase Step 8 (scaffolded) | `set Status=Todo` on the phase item |
-| ExecPhase Step 10b (phase done + close) | `set Status=Done` on the phase item |
-| ExecPhase Step 7 (gate-cap-hit) | `set Status=Blocked` on the phase item |
-| ExecPhase final phase | `set Status=Done` on the overview item |
+| Plan-2-Tasks, after creating issues (§ 7g) | overview: `project_sync.sh add <map> <config> overview <overview_issue_url> --slug <slug>` · per phase: `project_sync.sh add <map> <config> phase:<N> <phase_issue_url> --slug <slug> --phase <N>` (Repo auto-populates from the built-in **Repository** field; item ids cached into the `project` block) |
+| ScaffoldPhase Step 8 (scaffolded) | `project_sync.sh status <map> phase:<N> Todo` |
+| ExecPhase Step 10b (phase done + close) | `project_sync.sh status <map> phase:<N> Done` |
+| ExecPhase Step 7 (gate-cap-hit) | `project_sync.sh status <map> phase:<N> Blocked` |
+| ExecPhase final phase | `project_sync.sh status <map> overview Done` |
 
 ## Invariants
 
 - **Gated** — only runs when `project` resolves to a real board.
-- **Degrade-gracefully** — gh-auth failure, unresolvable project, missing field/option, or permission denial → log + skip. Issues + the markdown tracker stay authoritative; a project failure **never** blocks the pipeline. (`update_tracker.sh` exits non-zero without throwing; ignore its exit code.)
-- **Idempotent** — check `project.phase_items[N]` before adding; field-sets are idempotent. Safe to re-run.
+- **Degrade-gracefully** — gh-auth failure, unresolvable project, missing field/option, or permission denial → log + skip. Issues + the markdown tracker stay authoritative; a project failure **never** blocks the pipeline. (`project_sync.sh` logs and exits non-zero without throwing; callers ignore its exit code.)
+- **Idempotent** — `project_sync.sh add` checks `project.{overview_item,phase_items[N]}` before adding; field-sets are idempotent. Safe to re-run.
 - **Projection-of-a-projection** — Project ← issues ← markdown tracker. Nothing upstream depends on the board.
 
 ## Expected field schema on the board

@@ -168,10 +168,10 @@ Push the body and swap labels in a single call:
 
 → `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label not-scaffolded --add-label scaffolded`
 
-**Project sync (gated):** if `autviam_config.json` → `project` is set, also set the phase item's Status to `Todo` (see `references/project_sync.md`) — best-effort, skip if project is disabled:
+**Project sync (gated):** also set the phase item's Status to `Todo` via `project_sync.sh` (self-gated, idempotent, best-effort — no-ops when project is disabled; see `references/project_sync.md`):
 
 ```bash
-.claude/scripts/update_tracker.sh set <phase_issue_url> Status Todo
+<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<N> Todo
 ```
 
 **Total `gh` budget for Step 8: 1 call** (+1 best-effort project call when armed; vs N+2 in Aut_Faciam).

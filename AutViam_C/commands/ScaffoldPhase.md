@@ -170,10 +170,10 @@ Push the body and swap labels in a single call:
 
 (One `gh` call: body update + label swap together. The script skips and exits 3 if `gh` is unauthenticated.)
 
-**Project sync (gated):** if `autviam_c_config.json` → `project` is set, also set the phase item's Status to `Todo` (see `references/project_sync.md`) — best-effort, skip if project is disabled:
+**Project sync (gated):** also set the phase item's Status to `Todo` — self-gated/best-effort, no-ops if project is disabled (see `references/project_sync.md`):
 
 ```bash
-.codex/scripts/update_tracker.sh set <phase_issue_url> Status Todo
+<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<N> Todo
 ```
 
 **Total `gh` budget for Step 8: 1 call** (+1 best-effort project call when armed; vs N+2 in Aut_Faciam).

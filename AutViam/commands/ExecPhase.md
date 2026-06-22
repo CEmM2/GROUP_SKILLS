@@ -145,7 +145,7 @@ When `cap-check` returns `CAP-HIT` (the 4th failure on the same gate is durable 
 1. **Mark the task in the gates file (you author this):** add a `## STATUS: gate-cap-hit on Gate <X>` block with the four failure entries summarized — prose, not a script.
 2. **Update the task JSON:** → run `<skill_root>/scripts/gate_state.py set-status <task_json> gate-cap-hit` (leaves other completion fields untouched).
 3. **Update the tracker:** mark this row `gate-cap-hit` with a link to the gates entry.
-4. **GitHub:** → run `<skill_root>/scripts/issue_body.sh label <phase_issue> --add gate-cap-hit` (label-only, no body/close). **Project sync (gated):** if armed, also `set Status=Blocked` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled.
+4. **GitHub:** → run `<skill_root>/scripts/issue_body.sh label <phase_issue> --add gate-cap-hit` (label-only, no body/close). **Project sync (gated):** also → `<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<phase_id> Blocked` (self-gated, best-effort — no-ops when project disabled; `references/project_sync.md`).
 5. **Stop dispatching new tasks.** Set an internal `stop_new_dispatches` flag.
 6. **Wait for all in-flight parallel tasks to finish their current gate sequence.** They may themselves hit the cap — log each one the same way. Do not cancel them; let them complete (pass or cap).
 7. **Once all parallel tasks have settled, surface the stop report and ask the user:**
@@ -231,9 +231,9 @@ Per `references/issue_body_updates.md`:
 3. `MultiEdit`: for each task ID in `completed_this_phase`, replace `- [ ] <task_id>` → `- [x] <task_id>` (one MultiEdit call, N edits — never `sed -i`).
 4. `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label in-progress --add-label done --state closed` — body update, label swap, and close in one call.
 
-**Project sync (gated):** if armed, `set Status=Done` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled:
+**Project sync (gated):** `set Status=Done` on the phase item via `project_sync.sh` (self-gated, best-effort — no-ops when project disabled; `references/project_sync.md`):
 ```bash
-.claude/scripts/update_tracker.sh set <phase_issue_url> Status Done
+<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<N> Done
 ```
 (The `phase-close.sh` PostToolUse backstop also performs this set when 10b's in-band call is skipped — they're idempotent.)
 
@@ -246,7 +246,7 @@ Per `references/issue_body_updates.md`:
 3. `Edit` tool: `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`.
 4. `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> /tmp/overview_body.md`.
 
-**Project sync (gated, final phase only):** on the last phase, also `set Status=Done` on the overview item (`references/project_sync.md`).
+**Project sync (gated, final phase only):** on the last phase, also `set Status=Done` on the overview item → `<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json overview Done` (self-gated, best-effort; `references/project_sync.md`).
 
 **Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
 

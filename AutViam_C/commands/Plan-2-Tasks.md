@@ -135,15 +135,21 @@ Already created by the `init_plan.sh dirs <tasks_folder>` call in Step 7 (it sca
 
 ### 7h. Project sync (gated — only if `autviam_c_config.json` → `project` is set)
 
-If project sync is armed, read `references/project_sync.md`, then add the overview issue and each phase issue to the board and set their fields:
+Add the overview issue and each phase issue to the board with `project_sync.sh` (issue URL = `https://github.com/<repo>/issues/<number>`):
 
 ```bash
-.codex/scripts/update_tracker.sh add <issue-url>            # → item id
-.codex/scripts/update_tracker.sh set <issue-url> Plan  <slug>
-.codex/scripts/update_tracker.sh set <issue-url> Phase <N>   # phase issues only
+# overview
+<skill_root>/scripts/project_sync.sh add <tasks_folder>/github_issue_map.json \
+  <skill_root>/autviam_c_config.json overview \
+  https://github.com/<repo>/issues/<overview_issue> --slug <slug>
+
+# per phase <N>
+<skill_root>/scripts/project_sync.sh add <tasks_folder>/github_issue_map.json \
+  <skill_root>/autviam_c_config.json phase:<N> \
+  https://github.com/<repo>/issues/<phase_issue> --slug <slug> --phase <N>
 ```
 
-The built-in **Repository** field auto-populates — no Repo set needed. Append a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to `github_issue_map.json` so Scaffold/ExecPhase reuse the item ids. If `project` is `"disable"`/absent, skip this step entirely — same degrade-gracefully rule as 7a's `gh auth` pre-check.
+`project_sync.sh` is self-gated (no-op when `project` is `"disable"`/absent — same degrade-gracefully rule as 7a's `gh auth` pre-check), idempotent (skips an already-cached item), and best-effort (never blocks the pipeline). It sets `Plan`/`Phase`, lets the built-in **Repository** field auto-populate, and writes the `project` block (`owner`, `number`, `overview_item`, `phase_items`) into `github_issue_map.json` itself — no manual JSON edit. See `references/project_sync.md`.
 
 ---
 

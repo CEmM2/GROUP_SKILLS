@@ -121,7 +121,7 @@ The implementer remains template-based (`templates/task_instructions_template.md
 
 ### Bundled scripts
 
-Six helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). The commands call these for the deterministic, error-prone plumbing; the LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
+Seven helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). The commands call these for the deterministic, error-prone plumbing; the LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
 
 | Script | Owns |
 |---|---|
@@ -130,7 +130,8 @@ Six helper scripts live at `<skill_root>/scripts/` and run without an install st
 | `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |
 | `phase_git.sh` | Phase branch create/checkout with a dirty-tree guard, and reverse-order `git revert` rollback (never `reset --hard` on a shared branch). |
 | `match_specialists.sh` | Config-driven specialist/skill matcher — emits the matched `autviam_c_config.json` entries whose `trigger_patterns` hit the diff (deterministic, no LLM at trigger time). |
-| `update_tracker.sh` | GitHub Project board sync helper (gated — see `references/project_sync.md`). |
+| `project_sync.sh` | The gated GitHub Project wrapper (`resolve`/`add`/`status`): board resolution from `autviam_c_config.json` → `project` (4 forms + name→number), idempotency, and the `project`-block bookkeeping in `github_issue_map.json`. Self-gates to a no-op when project sync is off; wraps `update_tracker.sh`. See `references/project_sync.md`. |
+| `update_tracker.sh` | Low-level GitHub Project primitive (one `gh project item-edit` per call, IDs cached) wrapped by `project_sync.sh`. Not called directly by the commands. |
 
 ---
 

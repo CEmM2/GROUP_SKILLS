@@ -32,10 +32,12 @@ Tick the phase's checkbox in the plan-overview body per `references/issue_body_u
 If the `project` block is present (project sync armed — see `references/project_sync.md`), set the phase item's Status to Done; on the final phase, also set the overview item Done:
 
 ```bash
-.codex/scripts/update_tracker.sh set <phase_issue_url> Status Done
+<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<N> Done
+# final phase only:
+<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json overview Done
 ```
 
-Best-effort — skip silently if project sync is disabled or the helper is absent.
+Self-gated/best-effort — `project_sync.sh` no-ops silently if project sync is disabled or the board is unresolvable.
 
 ## Step 5 — Report
 
