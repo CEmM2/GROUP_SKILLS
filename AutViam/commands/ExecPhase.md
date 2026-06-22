@@ -33,9 +33,7 @@ Apply the model assignment rule from SKILL.md § Model Assignment — do not res
 
 ## Step 3 — Branch setup
 
-```bash
-git checkout -b <plan_slug>_phase-<phase_id>
-```
+→ run `<skill_root>/scripts/phase_git.sh branch <plan_slug> <phase_id> [--from <parent_branch>]`. It checks out `<plan_slug>_phase-<phase_id>` (creating it from `<parent_branch>` if given, else current HEAD), **refuses on a dirty working tree** (commit/stash first), and prints the branch name.
 
 Never implement on `main`/`master` without explicit user consent.
 
@@ -50,17 +48,9 @@ Never implement on `main`/`master` without explicit user consent.
 
 Dispatch via the Task tool using `templates/task_instructions_template.md`. The template tells the implementer to `Read` the task JSON itself — **do not paste JSON content into the prompt**.
 
-**Pre-dispatch skill check (deterministic bash):**
-```bash
-test -f <skill_root>/autviam_config.json && cat <skill_root>/autviam_config.json
-```
-If the config exists, read `implementer.skills`. For each skill, run:
-```bash
-git diff --name-only <pre-task SHA>..<current HEAD> | grep -E '<skill.trigger_patterns[0]>'
-# repeat for each pattern (OR logic — any match qualifies)
-```
-Build `implementer_skills`: list of `{skill, skill_md}` for each skill where at least one diff file matched.
-If the config is absent or `implementer_skills` is empty, omit the `## Repo-configured skills` section from the prompt (backward compatible).
+**Pre-dispatch skill check (deterministic):**
+→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json implementer.skills <pre-task SHA> <current HEAD>`. It emits a JSON array of the matched `implementer.skills` config entries (each carrying its `skill`/`skill_md`) — entries whose `trigger_patterns` hit at least one file in the diff. Absent config or empty section → `[]`.
+Use that array as `implementer_skills`. If it is empty, omit the `## Repo-configured skills` section from the prompt (backward compatible).
 `skill_md` path: `<skill_root>/../<skill-dir>/SKILL.md` (resolve relative to the AutViam skill root).
 
 Pass to the implementer:
@@ -73,7 +63,9 @@ Pass to the implementer:
 
 If the implementer asks clarifying questions before starting, answer them fully before allowing it to proceed.
 
-**Initialize the task entry** in `gates/phase_<phase_id>_gates.md` (see `templates/gate_entry.md`).
+**Initialize the gate file and the task entry** (deterministic — `templates/gate_entry.md` is the format):
+→ `<skill_root>/scripts/gate_state.py init <tasks_folder>/gates/phase_<phase_id>_gates.md --phase <phase_id> --plan <plan_file> --branch <branch>` (writes the header once; no-op if it already exists).
+→ `<skill_root>/scripts/gate_state.py init-task <tasks_folder>/gates/phase_<phase_id>_gates.md <task_id> "<title>"` (adds the per-task section skeleton with the `**Failure counters:**` line; no-op if present).
 
 **No `gh` call here.** Tasks transition to `in-progress` only at phase level — there is no per-task issue to label.
 
@@ -81,7 +73,7 @@ If the implementer asks clarifying questions before starting, answer them fully 
 
 After each implementer reports completion, run gates in order. **No `gh` calls during gate loops** — record everything in `gates/phase_<phase_id>_gates.md` (format: `templates/gate_entry.md`).
 
-**Failure-cap rule (non-negotiable):** track `gate_a_failures` and `gate_b_failures` and `gate_c_failures` per task. On the **3rd** failure of any one gate, the next attempt is the last. If that 4th attempt also fails on the same gate → **gate cap hit** → go to Step 7.
+**Failure-cap rule (non-negotiable):** the failure counts live in the gates file, not memory — after recording each FAIL attempt block, run `<skill_root>/scripts/gate_state.py cap-check <gates_file> <task_id> <gate>`. It prints `OK n` (n fails so far) or `CAP-HIT n` once the 4th failure on the same gate is durable in the file. On `CAP-HIT` → go to Step 7. Also run `<skill_root>/scripts/gate_state.py sync-counters <gates_file> <task_id>` after each recorded attempt to refresh the `**Failure counters:**` line. (`<gates_file>` = `<tasks_folder>/gates/phase_<phase_id>_gates.md`.)
 
 ### Gate A — Spec Compliance
 
@@ -99,25 +91,15 @@ prior_failure_summary: <only if retry — copy the Issues list from the prior ga
 
 If the agent is not installed, fall back to dispatching the Task tool with the agent's system prompt inlined (see `agents/autviam-spec-reviewer.md`).
 
-Parse the verdict line. On FAIL: record the failure entry in the gates file (1–2 sentences + JSON block with `failure_mode`, `what_failed`, `why`). Pass the agent's Issues list to the implementer, ask it to fix, re-run Gate A. Increment `gate_a_failures`.
+Parse the verdict line. On FAIL: **you author** the failure entry in the gates file (1–2 sentences of domain prose + the ```json``` attempt block with `failure_mode`, `what_failed`, `why`). Then run `gate_state.py cap-check <gates_file> <task_id> A` (and `sync-counters`); on `CAP-HIT` go to Step 7, else pass the agent's Issues list to the implementer, ask it to fix, and re-run Gate A.
 
 ### Gate B — Domain Quality
 
 Only after Gate A passes.
 
-**Pre-dispatch specialist check (deterministic bash):**
-```bash
-# Check if repo-local specialist config exists
-test -f <skill_root>/autviam_config.json && cat <skill_root>/autviam_config.json
-```
-If the config exists, read `domain_reviewer.specialists`. For each specialist run:
-```bash
-git diff --name-only <base_sha>..<head_sha> | grep -E 'pattern1|pattern2|...'
-# (OR logic — any match qualifies)
-```
-Build `specialist_agents`: include only specialists where at least one diff file matched.
-If the config is absent or `specialist_agents` is empty, omit the field from the prompt
-(backward compatible — reviewer skips the specialist section entirely).
+**Pre-dispatch specialist check (deterministic):**
+→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>`. It emits the JSON array of `domain_reviewer.specialists` config entries whose `trigger_patterns` match at least one file in the diff (OR logic). Absent config or empty section → `[]`.
+Use that array as `specialist_agents`. If it is empty, omit the `specialist_agents` line from the prompt below (backward compatible — reviewer skips the specialist section entirely).
 
 Dispatch `autviam-domain-reviewer`:
 
@@ -134,7 +116,7 @@ specialist_agents: <JSON list — omit line if empty>
 """)
 ```
 
-On FAIL: record, pass Issues list to implementer, re-run **Gate A then Gate B** (Gate A may regress on fixes). Increment `gate_b_failures`.
+On FAIL: **you author** the prose+JSON attempt block, then run `gate_state.py cap-check <gates_file> <task_id> B` (and `sync-counters`); on `CAP-HIT` go to Step 7, else pass the Issues list to the implementer and re-run **Gate A then Gate B** (Gate A may regress on fixes).
 
 ### Gate C — Verification
 
@@ -142,7 +124,7 @@ Run task-relevant tests fresh. Apply the Iron Law:
 
 > Identify the command → run it fresh → read full output → pass = ≥ 95% on task-relevant tests → record exact counts in the gates file. No "should pass" / "probably works" claims.
 
-On FAIL: record, return to implementer with actual test output. Increment `gate_c_failures`.
+On FAIL: **you author** the prose+JSON attempt block (with actual test output), then run `gate_state.py cap-check <gates_file> <task_id> C` (and `sync-counters`); on `CAP-HIT` go to Step 7, else return to the implementer with the actual test output.
 
 ### Retry compression
 
@@ -158,12 +140,12 @@ Do not re-paste the original task description, diff, or report — the implement
 
 ## Step 7 — Gate cap hit (4th failure on same gate)
 
-When `gate_<x>_failures == 4` for a task:
+When `cap-check` returns `CAP-HIT` (the 4th failure on the same gate is durable in the gates file):
 
-1. **Mark the task in the gates file:** add a `## STATUS: gate-cap-hit on Gate <X>` block with the three failure entries summarized.
-2. **Update the task JSON:** `"status": "gate-cap-hit"`, leave other completion fields untouched.
+1. **Mark the task in the gates file (you author this):** add a `## STATUS: gate-cap-hit on Gate <X>` block with the four failure entries summarized — prose, not a script.
+2. **Update the task JSON:** → run `<skill_root>/scripts/gate_state.py set-status <task_json> gate-cap-hit` (leaves other completion fields untouched).
 3. **Update the tracker:** mark this row `gate-cap-hit` with a link to the gates entry.
-4. **GitHub:** add `gate-cap-hit` label to the **phase issue** (1 `gh` call). Do not edit the body or close anything yet. **Project sync (gated):** if armed, also `set Status=Blocked` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled.
+4. **GitHub:** → run `<skill_root>/scripts/issue_body.sh label <phase_issue> --add gate-cap-hit` (label-only, no body/close). **Project sync (gated):** if armed, also `set Status=Blocked` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled.
 5. **Stop dispatching new tasks.** Set an internal `stop_new_dispatches` flag.
 6. **Wait for all in-flight parallel tasks to finish their current gate sequence.** They may themselves hit the cap — log each one the same way. Do not cancel them; let them complete (pass or cap).
 7. **Once all parallel tasks have settled, surface the stop report and ask the user:**
@@ -203,13 +185,8 @@ When `gate_<x>_failures == 4` for a task:
 
 ### Local
 
-Update the task JSON:
-- `"status": "done"`, `"completion_date": "<today>"`
-- `test_completion` (passed/total/pass_rate/commands from Gate C)
-- `review_score`, `review_breakdown` (from Gate B)
-- `"review_status": "approved"`
-- `"implementation_branch": "<branch>"`
-- `completion_notes` (notable decisions/deviations)
+Write the ExecPhase-owned completion fields to the task JSON (deterministic — fixed schema):
+→ run `<skill_root>/scripts/gate_state.py complete <task_json> --branch <branch> --passed <p> --total <t> --review-score <s> [--minor <m> --medium <m> --high <m> --critical <m> --commands <cmd…> --notes "<notable decisions/deviations>"]`. This sets `status="done"`, `completion_date`, `test_completion` (passed/total/pass_rate/commands from Gate C), `review_score` + `review_breakdown` (from Gate B), `review_status="approved"`, `implementation_branch`, and `completion_notes` in one call.
 
 Update `<tracking_file>`: mark task done, fill `Verified by` / `PR/Commit` / `Completed on`.
 
@@ -231,13 +208,11 @@ When all tasks in `<phase_id>` are done (or the user has chosen to continue past
 
 Generate `<tasks_folder>/Handoff_Phase_<phase_id+1>.md` from `templates/Handoff_template.md`. On the final phase, generate it as a project completion summary; skip the "edit next phase issue" implication.
 
-Populate the `Session Reset Packet` from `gates/phase_<phase_id>_gates.md` and each task JSON:
+Populate the `Session Reset Packet` table:
+→ run `<skill_root>/scripts/gate_state.py reset-packet <tasks_folder>/gates/phase_<phase_id>_gates.md <tasks_folder>/json`. It emits the table rows for every task (including `done`, `skipped`, `gate-cap-hit`) with the deterministic cells already filled — **Status**, **Gate B Score** (from the task JSON `review_score`), and **Gate C** (the test count, or `not-run`). The Gate A score and Decision come back as `?` for you to fill:
 
-- Include every task in the phase, including `done`, `skipped`, and `gate-cap-hit`.
-- `Gate A Score` is the final Gate A reviewer score for the task. If Gate A was not reached, use `not-run`.
-- `Gate B Score` is the final Gate B reviewer score for the task. If Gate B was not reached, use `not-run`.
-- `Gate C` is the final task-relevant test count from Gate C, or `not-run`.
-- `Decision` is a short recommendation for the next session: `accept`, `fix now`, `defer`, or `retry`.
+- `Gate A Score`: read the gate file's Gate A reviewer verdicts and fill the final score per task (`not-run` if Gate A was never reached).
+- `Decision`: a short recommendation for the next session — `accept`, `fix now`, `defer`, or `retry`.
 
 Below the table, add one concise `Gate Findings` bullet per task:
 
@@ -251,10 +226,10 @@ Keep this section compact. It is a session-reset aid, not a full report; detaile
 
 Per `references/issue_body_updates.md`:
 
-1. `Bash`: `gh issue view <phase_issue> --json body -q .body`
-2. `Write` tool: `/tmp/phase_<N>_body.md`
-3. `MultiEdit`: for each task ID in `completed_this_phase`, replace `- [ ] <task_id>` → `- [x] <task_id>` (one MultiEdit call, N edits)
-4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md --remove-label "in-progress" --add-label "done" --state closed` — body update, label swap, and close in one call.
+1. `<skill_root>/scripts/issue_body.sh fetch <phase_issue>` → body to stdout.
+2. `Write` tool: `/tmp/phase_<N>_body.md`.
+3. `MultiEdit`: for each task ID in `completed_this_phase`, replace `- [ ] <task_id>` → `- [x] <task_id>` (one MultiEdit call, N edits — never `sed -i`).
+4. `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label in-progress --add-label done --state closed` — body update, label swap, and close in one call.
 
 **Project sync (gated):** if armed, `set Status=Done` on the phase item (`references/project_sync.md`) — best-effort, skip if project disabled:
 ```bash
@@ -266,10 +241,10 @@ Per `references/issue_body_updates.md`:
 
 Per `references/issue_body_updates.md`:
 
-1. `Bash`: `gh issue view <plan_overview_issue> --json body -q .body`
-2. `Write` tool: `/tmp/overview_body.md`
-3. `Edit` tool: `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`
-4. `Bash`: `gh issue edit <plan_overview_issue> --body-file /tmp/overview_body.md`
+1. `<skill_root>/scripts/issue_body.sh fetch <plan_overview_issue>` → body to stdout.
+2. `Write` tool: `/tmp/overview_body.md`.
+3. `Edit` tool: `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`.
+4. `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> /tmp/overview_body.md`.
 
 **Project sync (gated, final phase only):** on the last phase, also `set Status=Done` on the overview item (`references/project_sync.md`).
 

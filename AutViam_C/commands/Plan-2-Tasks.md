@@ -57,15 +57,17 @@ For each phase, create `<tasks_folder>/Phase_<N>_context_summary.md` from `templ
 
 **Pre-check:** `gh auth status`. If it fails, skip Step 7 entirely. Local artifacts (all-tasks.md, JSONs, tracker, context summaries) are already complete — GitHub integration can be added later by re-running Plan-2-Tasks.
 
-**Derive `plan_slug`:** lowercase the plan filename, replace `_` and spaces with `-`, drop the extension. Store in `github_issue_map.json` as `plan_slug`.
+**Derive `plan_slug`:** lowercase the plan filename, replace `_` and spaces with `-`, drop the extension.
+→ run `<skill_root>/scripts/init_plan.sh slug <plan_file>` (prints the slug). Store it in `github_issue_map.json` as `plan_slug` and reuse it for the issue titles/labels below.
+
+**Scaffold the per-plan folders** (json / gates / reviews) in one call:
+→ `<skill_root>/scripts/init_plan.sh dirs <tasks_folder>`
 
 ### 7a. Ensure labels exist (diff, don't blast)
 
-```bash
-gh label list --json name -q '.[].name' > /tmp/existing_labels.txt
-```
+→ run `<skill_root>/scripts/init_plan.sh labels <slug> "<plan_name>" <phase_count>`. It diffs against `gh label list` and creates only the MISSING labels (incl. `phase-1`..`phase-<phase_count>`), so a typical second-plan-in-the-same-repo run is 1–2 creates instead of 14+. If `gh` is unauthenticated it skips and exits 3.
 
-Required labels (created only if missing):
+The label taxonomy it ensures (reference — colors/descriptions live in the script):
 
 | Name | Color | Description |
 |---|---|---|
@@ -82,35 +84,30 @@ Required labels (created only if missing):
 | `tier:regression` | `f9d0c4` | Regression test tier |
 | `phase-<N>` (per phase) | `d4c5f9` | Phase <N> |
 
-For each name not in `/tmp/existing_labels.txt`, run `gh label create <name> --color <hex> --description "<desc>"`. Skip the rest. Typical second-plan-in-the-same-repo run = 1–2 label creates instead of 14+.
-
 ### 7b. Plan overview issue
 
-Render `templates/plan_overview_issue.md` to `/tmp/plan_overview_body.md`, then:
+Render `templates/plan_overview_issue.md` to `/tmp/plan_overview_body.md` (the body stays LLM-authored), then:
 
-```bash
-gh issue create --title "📋 [<slug>] Plan: <plan_name>" --label "plan-issue,plan:<slug>" --body-file /tmp/plan_overview_body.md
-```
+→ `num=$(<skill_root>/scripts/init_plan.sh create-issue --title "📋 [<slug>] Plan: <plan_name>" --labels "plan-issue,plan:<slug>" --body-file /tmp/plan_overview_body.md)`
 
-Capture the issue number.
+`create-issue` prints the new issue NUMBER on stdout — capture it as the overview issue number.
 
 ### 7c. Phase issues (one per phase, in order)
 
-Render `templates/phase_skeleton_issue.md` per phase, then:
+Render `templates/phase_skeleton_issue.md` per phase to `/tmp/phase_<N>_body.md` (LLM-authored body), then per phase:
 
-```bash
-gh issue create --title "[<slug>] Phase <N>: <phase_name>" --label "phase-issue,phase-<N>,not-scaffolded,plan:<slug>" --body-file /tmp/phase_<N>_body.md
-```
+→ `<skill_root>/scripts/init_plan.sh create-issue --title "[<slug>] Phase <N>: <phase_name>" --labels "phase-issue,phase-<N>,not-scaffolded,plan:<slug>" --body-file /tmp/phase_<N>_body.md`
 
-Capture each issue number.
+Capture each printed issue number (keyed by phase `<N>`) for §7d/§7e.
 
 ### 7d. Backfill phase numbers into plan overview
 
-The plan overview was created with `#<phase_issue_number>` placeholders. Replace them with real numbers using the canonical pattern in `references/issue_body_updates.md` — fetch once, edit all placeholders in one pass, push once.
+The plan overview was created with `#<phase_issue_number>` placeholders. Replace them with real numbers using the canonical pattern in `references/issue_body_updates.md`:
+→ `<skill_root>/scripts/issue_body.sh fetch <overview_issue>` → Write the body to `/tmp/issue_<overview>_body.md` → Edit all placeholders in one pass → `<skill_root>/scripts/issue_body.sh push <overview_issue> /tmp/issue_<overview>_body.md`.
 
 ### 7e. Save the issue map
 
-Write `<tasks_folder>/github_issue_map.json`:
+→ `<skill_root>/scripts/init_plan.sh map <tasks_folder> <plan_file> <slug> <overview_issue> <repo> 1:<i1> 2:<i2> …` writes `<tasks_folder>/github_issue_map.json` (one `<N>:<issue>` token per phase):
 
 ```json
 {
@@ -124,17 +121,17 @@ Write `<tasks_folder>/github_issue_map.json`:
 
 ### 7f. Add `github_issue` to each task JSON
 
+→ `<skill_root>/scripts/init_plan.sh annotate <tasks_folder>/json <tasks_folder>/github_issue_map.json` adds, keyed by each task's `phase`:
+
 ```json
 "github_issue": { "phase_issue": <phase_issue_number>, "repo": "<owner/repo>" }
 ```
 
 No `task_issue` field — phase-issues-only.
 
-### 7g. Create gates folder
+### 7g. Gates folder
 
-```bash
-mkdir -p <tasks_folder>/gates
-```
+Already created by the `init_plan.sh dirs <tasks_folder>` call in Step 7 (it scaffolds `json/`, `gates/`, and `reviews/`). Nothing to do here.
 
 ### 7h. Project sync (gated — only if `autviam_c_config.json` → `project` is set)
 

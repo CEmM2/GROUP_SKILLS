@@ -119,6 +119,19 @@ Three bundled Codex prompt profiles are defined in `agents/`:
 
 The implementer remains template-based (`templates/task_instructions_template.md`) because per-phase context is injected per dispatch.
 
+### Bundled scripts
+
+Six helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). The commands call these for the deterministic, error-prone plumbing; the LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
+
+| Script | Owns |
+|---|---|
+| `init_plan.sh` | Per-plan plumbing for Plan-2-Tasks Step 7: slug derivation, folder scaffolding, label diff/create, `gh issue create` (prints the number), issue-map write, task-JSON `github_issue` annotation. |
+| `issue_body.sh` | The two `gh` halves of the canonical issue-body roundtrip (`fetch` → LLM edits → `push`) plus label-only / state / close flags. The LLM still does the Edit between fetch and push — never `sed -i`. |
+| `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |
+| `phase_git.sh` | Phase branch create/checkout with a dirty-tree guard, and reverse-order `git revert` rollback (never `reset --hard` on a shared branch). |
+| `match_specialists.sh` | Config-driven specialist/skill matcher — emits the matched `autviam_c_config.json` entries whose `trigger_patterns` hit the diff (deterministic, no LLM at trigger time). |
+| `update_tracker.sh` | GitHub Project board sync helper (gated — see `references/project_sync.md`). |
+
 ---
 
 ## Task JSON Schema

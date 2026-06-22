@@ -4,9 +4,9 @@ Load this file only when (a) a task hits the gate failure cap (4th failure on th
 
 ## Single-task rollback
 
-1. **Find the last good commit.** Open `gates/phase_<N>_gates.md`, locate the most recent passing Gate C entry for any task on the current branch — its JSON block carries the commit SHA.
-2. **Revert the broken commit(s).** `git revert <bad_sha>` for each commit introduced by the failing task, in reverse order. Preserves history. **Never** use `git reset --hard` on a shared branch.
-3. **Reset the task JSON.** Set `status="pending"`, clear `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status`, `implementation_branch`, `completion_notes`.
+1. **Find the last good commit.** → run `<skill_root>/scripts/gate_state.py last-good-sha <gates_file>` (`<gates_file>` = `gates/phase_<N>_gates.md`). It scans the gate file and prints the most recent passing Gate C commit SHA (exits non-zero if none found).
+2. **Revert the broken commit(s).** → run `<skill_root>/scripts/phase_git.sh revert <bad_sha> [<bad_sha>…]`. It `git revert --no-edit`s each SHA in **reverse order** (preserves history; **never** `git reset --hard` on a shared branch). On a revert conflict it stops and tells you to resolve by hand.
+3. **Reset the task JSON.** → run `<skill_root>/scripts/gate_state.py reset-task <task_json>`. It sets `status="pending"` and clears `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status`, `implementation_branch`, `completion_notes` to template defaults.
 4. **Mark the tracker.** Add a `reverted` note in the tracker row pointing to the gate history entry that captured the failure pattern.
 5. **Re-attempt or escalate.** Either re-dispatch with the failure context as additional guidance, or surface it for human intervention.
 

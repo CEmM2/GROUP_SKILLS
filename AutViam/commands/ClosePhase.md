@@ -20,15 +20,11 @@ If `<tasks_folder>/Handoff_Phase_<phase_id+1>.md` is absent, generate it from `t
 
 ## Step 3 — Close the phase issue (idempotent)
 
-Skip if already closed. Otherwise, in one call:
+Skip if already closed. Otherwise swap labels + close + leave the note in one call (no body rewrite needed):
 
-```bash
-gh issue edit <phase_issue> --repo <repo> \
-  --remove-label "in-progress" --add-label "done" --state closed \
-  --comment "Phase <N> completed manually — closed via /AutViam close-phase."
-```
+→ `<skill_root>/scripts/issue_body.sh close <phase_issue> --remove in-progress --add done --comment "Phase <N> completed manually — closed via /AutViam close-phase."`
 
-Tick the phase's checkbox in the plan-overview body per `references/issue_body_updates.md` (fetch → Edit → push).
+Tick the phase's checkbox in the plan-overview body per `references/issue_body_updates.md`: `<skill_root>/scripts/issue_body.sh fetch <plan_overview_issue>` → Write to `/tmp/overview_body.md` → Edit the checkbox → `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> /tmp/overview_body.md`.
 
 ## Step 4 — Project sync (gated)
 

@@ -136,32 +136,26 @@ Re-run '/AutViam install' any time to update.
 ExecPhase/ExecTask pick up the config automatically — no restart needed.
 ```
 
-## Step 6 — Install the project-tracker helper (deterministic)
+## Step 6 — Install the bundled scripts (deterministic)
 
-Copy the bundled `update_tracker.sh` helper into the host repo so the GitHub Project
-sync path has an executable to call. This is the single script that
-`references/project_sync.md`, Plan-2-Tasks §7h, ScaffoldPhase, and ExecPhase invoke
-when Project sync is armed.
+Copy the bundled helper scripts into the host repo at a stable repo-local path. The command files already invoke them from `<skill_root>/scripts/` (so they work even without this step); this copy also places them under `.claude/scripts/`, where `references/project_sync.md` expects `update_tracker.sh`. The set: `update_tracker.sh` (Project sync), `init_plan.sh` (slug/dirs/labels/issues/map), `issue_body.sh` (issue-body roundtrip), `gate_state.py` (gate counting + task-JSON writeback), `phase_git.sh` (branch + rollback), `match_specialists.sh` (config-driven specialist matching).
 
 ```bash
 mkdir -p .claude/scripts
-if [ -e .claude/scripts/update_tracker.sh ]; then
-  # Don't clobber a repo-customized helper — drop a .new alongside for the user to diff.
-  cp <skill_root>/scripts/update_tracker.sh .claude/scripts/update_tracker.sh.new
-  echo "update_tracker.sh already present — wrote .claude/scripts/update_tracker.sh.new instead (diff and merge manually)."
-else
-  cp <skill_root>/scripts/update_tracker.sh .claude/scripts/update_tracker.sh
-  chmod +x .claude/scripts/update_tracker.sh
-  echo "Installed .claude/scripts/update_tracker.sh"
-fi
+for s in <skill_root>/scripts/*; do
+  base="$(basename "$s")"
+  if [ -e ".claude/scripts/$base" ]; then
+    # Don't clobber a repo-customized copy — drop a .new alongside for the user to diff.
+    cp "$s" ".claude/scripts/$base.new"
+    echo "$base already present — wrote .claude/scripts/$base.new (diff and merge manually)."
+  else
+    cp "$s" ".claude/scripts/$base"; chmod +x ".claude/scripts/$base"
+    echo "Installed .claude/scripts/$base"
+  fi
+done
 ```
 
-The helper is **best-effort / no-op unless armed**: it only does anything when this repo's
-`autviam_config.json` → `project` names a board (and `gh` is authenticated). With
-`project: "disable"` (the default) nothing calls it, and even when armed it degrades
-gracefully — an unauthenticated `gh` or an unresolvable field logs to stderr and exits
-non-zero without ever blocking a phase. Installing it now just means the executable is in
-place for the day you flip `project` on.
+All are best-effort / safe: the GitHub & Project scripts no-op unless `gh` is authenticated (and Project sync stays fully off until `autviam_config.json` → `project` names a board); the rest only run when a command invokes them, and never block a phase on failure.
 
 ## Notes
 

@@ -40,6 +40,19 @@ Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer
 
 ## Shared Architecture
 
+### Bundled scripts
+
+Six helper scripts live at `<skill_root>/scripts/` and own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls). They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
+
+| Script | Owns |
+|---|---|
+| `init_plan.sh` | Plan-2-Tasks Step 7 plumbing: `slug`, `dirs` (json/gates/reviews), `labels` (diff-only create), `create-issue` (prints #), `map`, `annotate`. |
+| `issue_body.sh` | The canonical issue-body roundtrip `gh` halves: `fetch`, `push` (body + label swap + close/state flags), `label` (label-only). LLM does the Edit/MultiEdit between fetch and push. |
+| `gate_state.py` | Gate-file + task-JSON state: `init`/`init-task`, `count`/`cap-check`/`sync-counters` (the 3-failure cap, durable from the file), `complete`/`set-status`/`reset-task`, `last-good-sha`, `reset-packet`. |
+| `phase_git.sh` | Deterministic git sequences: `branch` (canonical name + dirty-tree guard), `revert` (reverse-order `git revert`, never `reset --hard`). |
+| `match_specialists.sh` | Config-driven specialist/skill matcher: emits the JSON array of `autviam_config.json` entries whose `trigger_patterns` hit the diff. Absent config/section → `[]`. |
+| `update_tracker.sh` | GitHub Project (board) sync — `add`/`set` item fields. Gated on `autviam_config.json` → `project` (see `references/project_sync.md`). |
+
 ### Folder Conventions
 - `<tasks_folder>` defaults to `dev/plans/<plan_file_stem>/` — the per-plan home for all derived artifacts (task JSONs, context summaries, tracker, gates, reviews, issue map, handoffs). The plan markdown itself stays at `dev/plans/<plan_file_stem>.md`, beside this folder.
 - `<tracking_file>` defaults to `<tasks_folder>/tasks-tracker.md`
@@ -76,7 +89,7 @@ Single bridge file at `<tasks_folder>/github_issue_map.json`:
 
 Plan-2-Tasks creates this. Subsequent commands read it. **There is no per-task issue layer** — tasks are tracked as checkboxes inside the phase issue body. This is the single largest cost reduction vs Aut_Faciam.
 
-**Project sync (gated):** when `autviam_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7h appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
+**Project sync (gated):** when `autviam_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7g appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
 
 ### Label Taxonomy (names only — colors and creation live in Plan-2-Tasks § 7a)
 `plan:<slug>`, `plan-issue`, `phase-issue`, `not-scaffolded`, `scaffolded`, `phase-N`, `in-progress`, `done`, `gate-cap-hit`.
@@ -157,14 +170,16 @@ approval, and writes `<skill_root>/autviam_config.json`.
 
 **Runtime mechanics (deterministic — no LLM at trigger time):**
 
-Before dispatching the domain reviewer, ExecPhase runs:
+Before dispatching the domain reviewer, ExecPhase/ExecTask runs:
 ```bash
-git diff --name-only <base_sha>..<head_sha> \
-  | grep -E '<trigger_pattern>'
+<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>
 ```
-for each configured specialist. Only specialists with at least one matching file are included
-in the `specialist_agents` list injected into the domain reviewer prompt. An empty list means
-standard review — fully backward compatible with repos that have no config.
+which emits the JSON array of config entries whose `trigger_patterns` match at least one file in
+`git diff --name-only <base_sha>..<head_sha>` (OR logic). That array is the `specialist_agents` list
+injected into the domain reviewer prompt. An empty array (no config, empty section, or no match) means
+standard review — fully backward compatible with repos that have no config. The implementer skill check
+and Gate A spec-reviewer specialist check use the same script with the `implementer.skills` /
+`spec_reviewer.specialists` section.
 
 **The config is repo-local.** It is never part of the upstream AutViam skill definition.
 Template: `templates/autviam_config_template.json`.

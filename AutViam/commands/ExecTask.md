@@ -30,54 +30,49 @@ Compute complexity and risk (1–5 each). Apply SKILL.md § Model Assignment.
 
 If not already on `<plan_slug>_phase-<phase>`:
 
-```bash
-git checkout -b <plan_slug>_phase-<phase>
-```
+→ run `<skill_root>/scripts/phase_git.sh branch <plan_slug> <phase> [--from <parent_branch>]`. It checks out (or creates) `<plan_slug>_phase-<phase>`, refuses on a dirty working tree, and prints the branch name. No-op-safe if you're already on that branch.
 
-`plan_slug` lives in `github_issue_map.json`. If no map exists (Plan-2-Tasks was run without GitHub), derive it: lowercase plan filename, `_`/spaces → `-`, drop extension.
+`plan_slug` lives in `github_issue_map.json`. If no map exists (Plan-2-Tasks was run without GitHub), derive it with `<skill_root>/scripts/init_plan.sh slug <plan_file>`.
 
 ## Step 3 — Implementer dispatch
 
 Use `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content.
 
-**Pre-dispatch skill check (deterministic bash):** same as ExecPhase Step 5 — read
-`<skill_root>/autviam_config.json` if present, test each skill's `trigger_patterns`
-against `git diff --name-only <base_sha>..<head_sha>`, build `implementer_skills` list
-(omit `## Repo-configured skills` section from prompt if empty). Pass `implementer_skills`
-to the implementer prompt when non-empty.
+**Pre-dispatch skill check (deterministic):** same as ExecPhase Step 5 —
+→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json implementer.skills <base_sha> <head_sha>`. Use the returned JSON array as `implementer_skills` (omit the `## Repo-configured skills` section from the prompt if empty).
 
-Initialize the task entry in `gates/phase_<phase>_gates.md`.
+Initialize the gate file and task entry (deterministic):
+→ `<skill_root>/scripts/gate_state.py init <tasks_folder>/gates/phase_<phase>_gates.md --phase <phase> --plan <plan_file> --branch <branch>` (header, no-op if present).
+→ `<skill_root>/scripts/gate_state.py init-task <tasks_folder>/gates/phase_<phase>_gates.md <task_id> "<title>"` (per-task section, no-op if present).
 
 **No `gh` call here** — there is no per-task issue under AutViam.
 
 ## Step 4 — Gates (cap = 3 failures per gate)
 
-Run A → B → C in sequence. Track `gate_a_failures`, `gate_b_failures`, `gate_c_failures` for this task.
+Run A → B → C in sequence. Failure counts live in the gates file, not memory: after recording each FAIL attempt block, run `<skill_root>/scripts/gate_state.py cap-check <gates_file> <task_id> <gate>` (prints `OK n` or `CAP-HIT n` on the 4th same-gate fail) and `<skill_root>/scripts/gate_state.py sync-counters <gates_file> <task_id>` to refresh the counters line. (`<gates_file>` = `<tasks_folder>/gates/phase_<phase>_gates.md`.)
 
 ### Gate A — Spec Compliance
-Dispatch `autviam-spec-reviewer` (see ExecPhase Step 6 for the prompt template). Parse verdict. On FAIL: record + increment + loop.
+Dispatch `autviam-spec-reviewer` (see ExecPhase Step 6 for the prompt template). Parse verdict. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … A` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block below, else loop.
 
 ### Gate B — Domain Quality
 Only after Gate A passes.
 
-**Pre-dispatch specialist check (deterministic bash):** same as ExecPhase Gate B — read
-`<skill_root>/autviam_config.json` if present, test each specialist's `trigger_patterns`
-against `git diff --name-only <base_sha>..<head_sha>`, build `specialist_agents` list
-(omit if empty). Pass `specialist_agents` to the domain reviewer prompt.
+**Pre-dispatch specialist check (deterministic):** same as ExecPhase Gate B —
+→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>`. Use the returned JSON array as `specialist_agents` (omit from the prompt if empty).
 
-Dispatch `autviam-domain-reviewer`. On FAIL: record + increment, re-run **Gate A then Gate B**.
+Dispatch `autviam-domain-reviewer`. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … B` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block, else re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
-Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims.
+Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … C` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block.
 
 ### Retry compression
 On any retry, pass the implementer just the reviewer's Issues list (~3–10 lines) + "Re-read your modifications and the spec. Re-run task tests." Do not re-paste the original task description or diff.
 
-### Gate cap hit (4th failure on same gate)
-1. Update task JSON: `"status": "gate-cap-hit"`.
-2. Record a `## STATUS: gate-cap-hit on Gate <X>` block in the gates file with all three failures summarized.
+### Gate cap hit (`cap-check` returned `CAP-HIT`)
+1. Update task JSON: → `<skill_root>/scripts/gate_state.py set-status <task_json> gate-cap-hit`.
+2. Record a `## STATUS: gate-cap-hit on Gate <X>` block in the gates file with all four failures summarized — **you author** this prose block.
 3. Update the tracker.
-4. Add the `gate-cap-hit` label to the phase issue (1 `gh` call).
+4. Add the `gate-cap-hit` label to the phase issue: → `<skill_root>/scripts/issue_body.sh label <phase_issue> --add gate-cap-hit`.
 5. Surface the stop report and ask the user:
 
 ```markdown
@@ -111,19 +106,20 @@ Read `references/recovery.md` only if option 4 or 5 is picked. Do not auto-resum
 ## Step 5 — Completion (all three gates pass)
 
 ### Local
-Update the task JSON: `status="done"`, `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status="approved"`, `implementation_branch`, `completion_notes`.
+Write the completion fields to the task JSON (deterministic — fixed schema):
+→ run `<skill_root>/scripts/gate_state.py complete <task_json> --branch <branch> --passed <p> --total <t> --review-score <s> [--minor <m> --medium <m> --high <m> --critical <m> --commands <cmd…> --notes "<notes>"]` — sets `status="done"`, `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status="approved"`, `implementation_branch`, `completion_notes` in one call.
 
 Update `<tracking_file>` (mark done, fill verification cells).
 
 Record completion in the gates file.
 
-### GitHub (1 `gh` call, batched-style for the single task)
+### GitHub (1 body roundtrip for the single task)
 Per `references/issue_body_updates.md`:
 
-1. `Bash`: `gh issue view <phase_issue> --json body -q .body`
-2. `Write` tool: `/tmp/phase_<N>_body.md`
-3. `Edit` tool: `- [ ] <task_id>` → `- [x] <task_id>` (exact-string)
-4. `Bash`: `gh issue edit <phase_issue> --body-file /tmp/phase_<N>_body.md`
+1. `<skill_root>/scripts/issue_body.sh fetch <phase_issue>` → body to stdout.
+2. `Write` tool: `/tmp/phase_<N>_body.md`.
+3. `Edit` tool: `- [ ] <task_id>` → `- [x] <task_id>` (exact-string — never `sed -i`).
+4. `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md`.
 
 **Budget:** 2 `gh` calls for the body roundtrip. No labels, no per-task issue. If this is the last task remaining in the phase, also do the phase handoff sequence from ExecPhase Step 10.
 

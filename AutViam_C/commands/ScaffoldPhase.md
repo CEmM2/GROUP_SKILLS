@@ -166,9 +166,9 @@ There are no task issue numbers — the checkbox text is the only identifier. Ex
 
 Push the body and swap labels in a single call:
 
-```bash
-gh issue edit <phase_issue> --remove-label "not-scaffolded" --add-label "scaffolded" --body-file /tmp/phase_<N>_body.md
-```
+→ `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label not-scaffolded --add-label scaffolded`
+
+(One `gh` call: body update + label swap together. The script skips and exits 3 if `gh` is unauthenticated.)
 
 **Project sync (gated):** if `autviam_c_config.json` → `project` is set, also set the phase item's Status to `Todo` (see `references/project_sync.md`) — best-effort, skip if project is disabled:
 
