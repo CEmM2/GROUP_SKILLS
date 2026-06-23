@@ -9,7 +9,7 @@ Every AutViam report (`gen-plan` visual companion, `plan-review`, `diff-review`,
 1. **Inline the theme.** Read `templates/report_theme.css` and paste it verbatim into a `<style>` block in `<head>` (keeps the file self-contained — no external asset except the Google Fonts `@import` already in the theme).
 2. **Append the shell CSS** below into the same `<style>` block.
 3. **Theme toggle, not theme choice.** The page ships `data-theme="light"`; the ◐ button flips to dark. Both must look intentional — the frozen theme already defines both.
-4. **Output location.** Plan-scoped reviews (`plan-review`, and `diff-review` against a plan) → the plan's `<reviews_folder>` (`dev/plans/<plan_file_stem>/reviews/`). Ad-hoc/standalone reports (`explain`, ad-hoc `diff-review`/`fact-check`) → `~/.agent/diagrams/<name>.html`. A `gen-plan` companion → next to the plan (e.g. `dev/plans/<slug>-plan.html`). Open it (`open` on macOS) and tell the user the path.
+4. **Output location.** Plan-scoped reviews (`plan-review`, and `diff-review` against a plan) → the plan's `<reviews_folder>` (`dev/plans/<plan_file_stem>/reviews/`). Ad-hoc/standalone reports (`explain`, ad-hoc `diff-review`/`fact-check`) → `dev/diagrams/<name>.html`. A `gen-plan` companion → next to the plan (e.g. `dev/plans/<slug>-plan.html`). Open it (`open` on macOS) and tell the user the path.
 5. **Content is structure, not prose dumps.** Cards, tables, Good/Bad/Ugly grids, pipelines — never paste whole source files. Snippets only, in `<pre>`.
 6. **No emoji section-header boxes, no gradient text, no glow** — the theme's badges/labels cover emphasis.
 

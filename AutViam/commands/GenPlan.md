@@ -4,7 +4,7 @@ The **planning gate** at the front of the AutViam pipeline. Turns a feature requ
 
 `gen-plan` complements the rest of AutViam: it produces the `<plan_file>` that `tasks` then decomposes. Pipeline: **`gen-plan` → `tasks` → `phase`×N (or `e2e`) → `diff-review`**.
 
-**Inputs:** `$@` — the feature request / problem statement. Optional codebase path, else the working directory.
+**Inputs:** `$@` — the feature request / problem statement. Optional codebase path, else the working directory. Optional `branch=this` → fork the plan branch from the current branch instead of `main` (see Step 6).
 
 ---
 
@@ -52,6 +52,7 @@ Summarize the plan (phases, task count, scope, key risks, anything still **uncer
 Only after approval:
 - Write the plan markdown to `dev/plans/<slug>.md` in the Plan-2-Tasks-shaped structure from Step 4 (this is the canonical input; `tasks` reads it in full once).
 - Render the **visual companion** with the frozen shell (read `references/report_shell.md`) to `dev/plans/<slug>-plan.html` — Problem (before/after), state machine, API/commands table, edge-cases table, test requirements, file references, risk callouts. It's a read-aid; the markdown is canonical. Open it.
+- **Create the plan branch** (SKILL.md § Branch & Worktree Model): → `<skill_root>/scripts/phase_git.sh plan-branch <slug>` forks `<slug>` from `main` **without checkout**, so `Plan-2-Tasks` can claim it for the plan worktree. If `branch=this` was passed, fork from the current branch instead: `<skill_root>/scripts/phase_git.sh plan-branch <slug> --from "$(git branch --show-current)"`. (Idempotent — `Plan-2-Tasks` re-runs it for hand-written plans that skipped `gen-plan`.)
 
 ## Step 7 — Hand off
 

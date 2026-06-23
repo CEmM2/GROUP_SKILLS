@@ -121,9 +121,9 @@ Record completion in the gates file.
 Per `references/issue_body_updates.md`:
 
 1. → `<skill_root>/scripts/issue_body.sh fetch <phase_issue>` (prints the body).
-2. Materialise the captured body to `/tmp/phase_<N>_body.md` with a Codex file-editing tool.
+2. Materialise the captured body to `<tasks_folder>/scratch/phase_<N>_body.md` with a Codex file-editing tool.
 3. Edit the temp file: `- [ ] <task_id>` → `- [x] <task_id>` (exact-string)
-4. → `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md`
+4. → `<skill_root>/scripts/issue_body.sh push <phase_issue> <tasks_folder>/scratch/phase_<N>_body.md`
 
 **Budget:** 2 `gh` calls for the body roundtrip. No labels, no per-task issue. If this is the last task remaining in the phase, also do the phase handoff sequence from ExecPhase Step 10.
 

@@ -12,9 +12,9 @@
 #   update_tracker.sh ids                                    # dump resolved field/option ids
 #   update_tracker.sh --refresh ...                          # bust the field-id cache first
 #
-# Config (env or .codex/scripts/tracker.env):
-#   TRACKER_OWNER   (default: SOSOVSKI)
-#   TRACKER_NUMBER  (default: 4)
+# Config (env or a tracker.env beside this script — <skill_root>/scripts/tracker.env):
+#   TRACKER_OWNER   (default: REPO_OWNER — placeholder sentinel; set this, or let project_sync.sh resolve it from config)
+#   TRACKER_NUMBER  (default: Project_N — placeholder sentinel; set this, or let project_sync.sh resolve it from config)
 #
 # Degrade-gracefully: if gh is unauthenticated or the project/field can't be
 # resolved, it logs to stderr and exits non-zero WITHOUT throwing — callers
@@ -23,11 +23,18 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$HERE/tracker.env" ] && . "$HERE/tracker.env"
-OWNER="${TRACKER_OWNER:-SOSOVSKI}"
-NUMBER="${TRACKER_NUMBER:-4}"
+OWNER="${TRACKER_OWNER:-REPO_OWNER}"
+NUMBER="${TRACKER_NUMBER:-Project_N}"
 CACHE="${TMPDIR:-/tmp}/ll_tracker_fields_${OWNER}_${NUMBER}.json"
 
 log() { printf '[update_tracker] %s\n' "$*" >&2; }
+
+# Placeholder guard: REPO_OWNER / Project_N are unset-config sentinels, not real values.
+# Project sync is opt-in — skip (best-effort) until TRACKER_OWNER/TRACKER_NUMBER are set
+# (env or a tracker.env beside this script), or resolved by project_sync.sh from config.
+if [ "$OWNER" = "REPO_OWNER" ] || [ "$NUMBER" = "Project_N" ]; then
+  log "TRACKER_OWNER/TRACKER_NUMBER unset (placeholders) — skipping project sync (best-effort)"; exit 3
+fi
 
 if [ "${1:-}" = "--refresh" ]; then rm -f "$CACHE"; shift; fi
 CMD="${1:-}"; shift || true

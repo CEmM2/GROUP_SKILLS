@@ -10,7 +10,7 @@
 #   init_plan.sh slug <plan_file>
 #       → prints plan_slug: lowercase, `_` and spaces → `-`, drop extension, collapse `-`.
 #   init_plan.sh dirs <tasks_folder>
-#       → mkdir -p <tasks_folder>/{json,gates,reviews}
+#       → mkdir -p <tasks_folder>/{json,gates,reviews,scratch}  (scratch = gitignored transient bodies)
 #   init_plan.sh labels <slug> <plan_name> <phase_count>
 #       → create only the MISSING labels (diff vs `gh label list`), incl phase-1..phase-<phase_count>.
 #   init_plan.sh create-issue --title T --labels "a,b" --body-file F
@@ -31,8 +31,8 @@ case "$CMD" in
 
   dirs)
     TF="${1:?usage: dirs <tasks_folder>}"
-    mkdir -p "$TF/json" "$TF/gates" "$TF/reviews"
-    log "scaffolded $TF/{json,gates,reviews}" ;;
+    mkdir -p "$TF/json" "$TF/gates" "$TF/reviews" "$TF/scratch"
+    log "scaffolded $TF/{json,gates,reviews,scratch}" ;;
 
   labels)
     SLUG="${1:?usage: labels <slug> <plan_name> <phase_count>}"; NAME="${2:?plan_name}"; PHASES="${3:?phase_count}"

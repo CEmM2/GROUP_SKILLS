@@ -24,6 +24,7 @@ Parse the first token of `$@` and read the matching command file from `commands/
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
 | `phase <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/Phase.md` |
 | `close-phase <phase_id> [plan_file] [tasks_folder]` | `commands/ClosePhase.md` |
+| `close-plan <plan_file> [tasks_folder]` | `commands/ClosePlan.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
 | `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks]` | `commands/E2E.md` |
 | `gen-plan <feature request>` | `commands/GenPlan.md` |
@@ -42,23 +43,38 @@ Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer
 
 ### Bundled scripts
 
-Seven helper scripts live at `<skill_root>/scripts/` and own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls). They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
+Nine helper scripts live at `<skill_root>/scripts/`. Seven own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls); the eighth and ninth, `phase-close.sh` (a PostToolUse hook backstop) and `draft_pr.sh` (the draft-PR opener, called both in-band and from the backstop), handle phase/plan finalization. They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
 
 | Script | Owns |
 |---|---|
 | `init_plan.sh` | Plan-2-Tasks Step 7 plumbing: `slug`, `dirs` (json/gates/reviews), `labels` (diff-only create), `create-issue` (prints #), `map`, `annotate`. |
 | `issue_body.sh` | The canonical issue-body roundtrip `gh` halves: `fetch`, `push` (body + label swap + close/state flags), `label` (label-only). LLM does the Edit/MultiEdit between fetch and push. |
 | `gate_state.py` | Gate-file + task-JSON state: `init`/`init-task`, `count`/`cap-check`/`sync-counters` (the 3-failure cap, durable from the file), `complete`/`set-status`/`reset-task`, `last-good-sha`, `reset-packet`. |
-| `phase_git.sh` | Deterministic git sequences: `branch` (canonical name + dirty-tree guard), `revert` (reverse-order `git revert`, never `reset --hard`). |
+| `phase_git.sh` | Deterministic git sequences: `branch` (phase branch + dirty-tree guard), `plan-branch` (create the plan branch `<slug>`, no checkout), `worktree` (add the plan worktree at `<repo-parent>/WorkTrees/<repo>-<slug>`), `revert` (reverse-order `git revert`, never `reset --hard`). |
 | `match_specialists.sh` | Config-driven specialist/skill matcher: emits the JSON array of `autviam_config.json` entries whose `trigger_patterns` hit the diff. Absent config/section → `[]`. |
 | `project_sync.sh` | The gated GitHub-Project writer (the high-level entry point): `resolve` (board OFF/owner+number), `add` (board item + Plan/Phase + `project`-block cache, idempotent), `status` (Status from the map). Self-gates on `autviam_config.json` → `project`; wraps `update_tracker.sh`. See `references/project_sync.md`. |
 | `update_tracker.sh` | Low-level Project primitive `project_sync.sh` calls — one `gh project item-edit` per `add`/`set`, IDs cached. Callers use `project_sync.sh`; this is the wrapped primitive. |
+| `phase-close.sh` | **PostToolUse hook backstop** (not command-invoked): on a `Handoff_Phase_<N>.md` write, idempotently closes the completed phase's issue (label swap in-progress→done), sets its Project item to Done, and opens the phase draft PR (via `draft_pr.sh`). Wire it per Install § Step 7. No-op for non-handoff writes; idempotent with ExecPhase Step 10b. |
+| `draft_pr.sh` | Opens the idempotent draft PR on handoff: `phase` (`<slug>_phase-<N>`→`<slug>`, label `merge:commit`) and `plan` (`<slug>`→`main`, label `merge:squash`). Body = the handoff's Phase-N completion-summary section + a repo-relative link to the handoff. gh-gated, best-effort. |
 
 ### Folder Conventions
 - `<tasks_folder>` defaults to `dev/plans/<plan_file_stem>/` — the per-plan home for all derived artifacts (task JSONs, context summaries, tracker, gates, reviews, issue map, handoffs). The plan markdown itself stays at `dev/plans/<plan_file_stem>.md`, beside this folder.
 - `<tracking_file>` defaults to `<tasks_folder>/tasks-tracker.md`
 - `<gates_folder>` is always `<tasks_folder>/gates/`
-- `<reviews_folder>` is always `<tasks_folder>/reviews/` — rendered review reports (`plan-review`, and `diff-review` when run against a plan) land here instead of the transient `~/.agent/diagrams/`.
+- `<reviews_folder>` is always `<tasks_folder>/reviews/` — rendered review reports (`plan-review`, and `diff-review` when run against a plan) land here instead of the transient `dev/diagrams/`.
+
+### Branch & Worktree Model
+The pipeline isolates each plan on its own branch + git worktree so phases merge cleanly and `main` history stays squash-clean:
+
+- **Plan branch `<plan_slug>`** — created at plan approval (`gen-plan` Step 6) from `main`, or from the current branch when `branch=this` is passed to `gen-plan`. Created **without checkout** (`phase_git.sh plan-branch`) so the worktree can claim it.
+- **Plan worktree** — `Plan-2-Tasks` adds a worktree at `<repo-parent>/WorkTrees/<repo>-<plan_slug>` on `<plan_slug>` (`phase_git.sh worktree`). **All derived artifacts and all phase work happen inside this worktree** (it owns `dev/plans/<stem>/`); the main checkout stays on whatever branch it was.
+- **Phase branches `<plan_slug>_phase-<N>`** — `ScaffoldPhase`/`ExecPhase` fork each phase from the plan branch (`phase_git.sh branch <slug> <N> --from <slug>`); the phase merges back into `<plan_slug>`.
+- **Merge flow:** `<plan_slug>_phase-<N>` → `<plan_slug>` (merge commit) → `main` (squash). The squash keeps `main` to one commit per plan.
+- **Draft PRs** (`draft_pr.sh` — best-effort, idempotent, opened in-band at ExecPhase Step 10 and by the `phase-close.sh` backstop): each phase handoff opens `<slug>_phase-<N>` → `<slug>` (label `merge:commit`); plan close opens `<slug>` → `main` (label `merge:squash`). GitHub can't pin a per-PR merge method, so the **label** records intent and the eventual `gh pr merge --merge`/`--squash` applies it. A handoff *update* rides the existing PR — no new PR.
+
+**Worktree discipline (every step, once a plan worktree exists):**
+- **Target the worktree explicitly for all git + file ops** — your shell's cwd can silently revert to the main checkout between tool calls, so never trust it. Use `git -C <worktree> …` for any ad-hoc git, and write to absolute paths under `<worktree>/`. The bundled scripts already enforce this: `phase_git.sh branch`, `draft_pr.sh`, and `phase-close.sh` resolve the plan worktree from the slug/map and run `git -C <worktree>` themselves, so a phase branch can't be created in the main checkout by accident.
+- **Tests run against main's env, the worktree's source** — a fresh worktree usually has no working `uv`/`.venv`. For Gate C, use the **main checkout's** environment and shadow in the worktree's code: `PYTHONPATH=<worktree> <main_checkout>/.venv/bin/python -m pytest <task tests>` (or `cd <main_checkout> && PYTHONPATH=<worktree> uv run pytest …`). Don't `uv sync`/recreate a venv inside the worktree just to test.
 
 ### Plan Reading Discipline (token discipline)
 - Plan-2-Tasks reads `<plan_file>` in full — once.
@@ -114,6 +130,7 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/failure_modes.md` — failure-mode taxonomy for gate entries. Read when first writing a gate failure entry.
 - `references/report_shell.md` — the one frozen HTML shell every report (`gen-plan` companion, `plan-review`, `diff-review`, `fact-check`, `arch`, `explain`) renders into. Read once per session, the first time you build a report.
 - `references/mermaid_module.md` — opt-in zoom/pan Mermaid topology block, theme-wired to the frozen shell. Read when a report (`arch`, `explain`, or a flow in `plan-review`/`diff-review`) needs a diagram with real edges.
+- `references/project_sync.md` — gated GitHub Project board sync mechanics (active only when `autviam_config.json` → `project` names a board). Read when wiring or refreshing Project item status.
 
 ### Subagents
 Three named Claude Code subagents are defined in `agents/`:
@@ -162,9 +179,11 @@ scans `.claude/agents/` and `.claude/skills/`, proposes trigger patterns, gets u
 approval, and writes `<skill_root>/autviam_config.json`.
 
 **What the config enables:**
-- `domain_reviewer.specialists` — agents ExecPhase dispatches during Gate B when the diff
+- `domain_reviewer.specialists` — extra review lenses applied during Gate B when the diff
   touches matching files. Each specialist's findings carry the same weight as the domain
-  reviewer's own findings.
+  reviewer's own findings. **By default the domain reviewer applies each lens inline** (reading
+  its `prompt_file`) rather than dispatching a separate agent — nested dispatch is unavailable
+  in inline/Phase mode, the default. See `agents/autviam-domain-reviewer.md`.
 - `spec_reviewer.specialists` — agents dispatched during Gate A (rare; most repos leave
   this empty).
 - `implementer.skills` — skills surfaced to the implementer template (future).

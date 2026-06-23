@@ -24,6 +24,7 @@ Parse the first token after the user's `AutViam_C` or `$AutViam_C` invocation an
 | `exec <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecPhase.md` |
 | `phase <phase_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/Phase.md` |
 | `close-phase <phase_id> [plan_file] [tasks_folder]` | `commands/ClosePhase.md` |
+| `close-plan <plan_file> [tasks_folder]` | `commands/ClosePlan.md` |
 | `task <task_id> <plan_file> [tasks_folder] [tracking_file]` | `commands/ExecTask.md` |
 | `e2e <plan_file> [tasks_folder] [tracking_file] [--stop-after <target>] [--skip-plan-2-tasks] [--arch]` | `commands/E2E.md` |
 | `gen-plan <feature request>` | `commands/GenPlan.md` |
@@ -44,7 +45,20 @@ Templates live in `templates/`. Codex agent prompt profiles live in `agents/` (s
 - `<tasks_folder>` defaults to `dev/plans/<plan_file_stem>/` — the per-plan home for all derived artifacts (task JSONs, context summaries, tracker, gates, reviews, issue map, handoffs). The plan markdown itself stays at `dev/plans/<plan_file_stem>.md`, beside this folder.
 - `<tracking_file>` defaults to `<tasks_folder>/tasks-tracker.md`
 - `<gates_folder>` is always `<tasks_folder>/gates/`
-- `<reviews_folder>` is always `<tasks_folder>/reviews/` — rendered review reports (`plan-review`, and `diff-review` when run against a plan) land here instead of the transient `~/.agent/diagrams/`.
+- `<reviews_folder>` is always `<tasks_folder>/reviews/` — rendered review reports (`plan-review`, and `diff-review` when run against a plan) land here instead of the transient `dev/diagrams/`.
+
+### Branch & Worktree Model
+The pipeline isolates each plan on its own branch + git worktree so phases merge cleanly and `main` history stays squash-clean:
+
+- **Plan branch `<plan_slug>`** — created at plan approval (`gen-plan` Step 6) from `main`, or from the current branch when `branch=this` is passed to `gen-plan`. Created **without checkout** (`phase_git.sh plan-branch`) so the worktree can claim it.
+- **Plan worktree** — `Plan-2-Tasks` adds a worktree at `<repo-parent>/WorkTrees/<repo>-<plan_slug>` on `<plan_slug>` (`phase_git.sh worktree`). **All derived artifacts and all phase work happen inside this worktree** (it owns `dev/plans/<stem>/`); the main checkout stays on whatever branch it was.
+- **Phase branches `<plan_slug>_phase-<N>`** — `ScaffoldPhase`/`ExecPhase` fork each phase from the plan branch (`phase_git.sh branch <slug> <N> --from <slug>`); the phase merges back into `<plan_slug>`.
+- **Merge flow:** `<plan_slug>_phase-<N>` → `<plan_slug>` (merge commit) → `main` (squash). The squash keeps `main` to one commit per plan.
+- **Draft PRs** (`draft_pr.sh` — best-effort, idempotent, opened in-band at ExecPhase Step 10 and by the `phase-close.sh` backstop): each phase handoff opens `<slug>_phase-<N>` → `<slug>` (label `merge:commit`); plan close opens `<slug>` → `main` (label `merge:squash`). GitHub can't pin a per-PR merge method, so the **label** records intent and the eventual `gh pr merge --merge`/`--squash` applies it. A handoff *update* rides the existing PR — no new PR.
+
+**Worktree discipline (every step, once a plan worktree exists):**
+- **Target the worktree explicitly for all git + file ops** — your shell's cwd can silently revert to the main checkout between tool calls, so never trust it. Use `git -C <worktree> …` for any ad-hoc git, and write to absolute paths under `<worktree>/`. The bundled scripts already enforce this: `phase_git.sh branch`, `draft_pr.sh`, and `phase-close.sh` resolve the plan worktree from the slug/map and run `git -C <worktree>` themselves, so a phase branch can't be created in the main checkout by accident.
+- **Tests run against main's env, the worktree's source** — a fresh worktree usually has no working `uv`/`.venv`. For Gate C, use the **main checkout's** environment and shadow in the worktree's code: `PYTHONPATH=<worktree> <main_checkout>/.venv/bin/python -m pytest <task tests>` (or `cd <main_checkout> && PYTHONPATH=<worktree> uv run pytest …`). Don't `uv sync`/recreate a venv inside the worktree just to test.
 
 ### Plan Reading Discipline (token discipline)
 - Plan-2-Tasks reads `<plan_file>` in full — once.
@@ -80,7 +94,7 @@ Single bridge file at `<tasks_folder>/github_issue_map.json`:
 
 Plan-2-Tasks creates this. Subsequent commands read it. **There is no per-task issue layer** — tasks are tracked as checkboxes inside the phase issue body. This is the single largest cost reduction vs Aut_Faciam.
 
-**Project sync (gated):** when `autviam_c_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7h appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
+**Project sync (gated):** when `autviam_c_config.json` → `project` names a board (not `"disable"`), Plan-2-Tasks § 7g appends a `project` block (`owner`, `number`, `overview_item`, `phase_items`) to this file, and Scaffold/ExecPhase keep each item's **Status** in step with the issue lifecycle (Todo → Done, or Blocked on gate-cap-hit). See `references/project_sync.md`. Absent or `"disable"` → no Project calls at all.
 
 ### Label Taxonomy (names only — colors and creation live in Plan-2-Tasks § 7a)
 `plan:<slug>`, `plan-issue`, `phase-issue`, `not-scaffolded`, `scaffolded`, `phase-N`, `in-progress`, `done`, `gate-cap-hit`.
@@ -121,17 +135,19 @@ The implementer remains template-based (`templates/task_instructions_template.md
 
 ### Bundled scripts
 
-Seven helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). The commands call these for the deterministic, error-prone plumbing; the LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
+Nine helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). Seven are called by the commands for the deterministic, error-prone plumbing; the eighth and ninth, `phase-close.sh` (a PostToolUse hook backstop) and `draft_pr.sh` (the draft-PR opener, called both in-band and from the backstop), handle phase/plan finalization. The LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
 
 | Script | Owns |
 |---|---|
 | `init_plan.sh` | Per-plan plumbing for Plan-2-Tasks Step 7: slug derivation, folder scaffolding, label diff/create, `gh issue create` (prints the number), issue-map write, task-JSON `github_issue` annotation. |
 | `issue_body.sh` | The two `gh` halves of the canonical issue-body roundtrip (`fetch` → LLM edits → `push`) plus label-only / state / close flags. The LLM still does the Edit between fetch and push — never `sed -i`. |
 | `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |
-| `phase_git.sh` | Phase branch create/checkout with a dirty-tree guard, and reverse-order `git revert` rollback (never `reset --hard` on a shared branch). |
+| `phase_git.sh` | Phase branch create/checkout with a dirty-tree guard; `plan-branch` (create the plan branch `<slug>`, no checkout); `worktree` (add the plan worktree at `<repo-parent>/WorkTrees/<repo>-<slug>`); reverse-order `git revert` rollback (never `reset --hard` on a shared branch). |
 | `match_specialists.sh` | Config-driven specialist/skill matcher — emits the matched `autviam_c_config.json` entries whose `trigger_patterns` hit the diff (deterministic, no LLM at trigger time). |
 | `project_sync.sh` | The gated GitHub Project wrapper (`resolve`/`add`/`status`): board resolution from `autviam_c_config.json` → `project` (4 forms + name→number), idempotency, and the `project`-block bookkeeping in `github_issue_map.json`. Self-gates to a no-op when project sync is off; wraps `update_tracker.sh`. See `references/project_sync.md`. |
 | `update_tracker.sh` | Low-level GitHub Project primitive (one `gh project item-edit` per call, IDs cached) wrapped by `project_sync.sh`. Not called directly by the commands. |
+| `phase-close.sh` | **PostToolUse hook backstop** (not command-invoked): on a `Handoff_Phase_<N>.md` write, idempotently closes the completed phase's issue, sets its Project item to Done, and opens the phase draft PR (via `draft_pr.sh`). Wire it per Install § Step 7. No-op for non-handoff writes; idempotent with ExecPhase Step 10b. |
+| `draft_pr.sh` | Opens the idempotent draft PR on handoff: `phase` (`<slug>_phase-<N>`→`<slug>`, label `merge:commit`) and `plan` (`<slug>`→`main`, label `merge:squash`). Body = the handoff's Phase-N completion-summary section + a repo-relative link to the handoff. gh-gated, best-effort. |
 
 ---
 
@@ -165,20 +181,22 @@ No `task_issue` field — phase-issues-only.
 Run `AutViam_C install` once per repo to wire up repo-specific Codex prompt profiles and skills. The command scans optional repo-local Codex agent/profile folders and skill folders, proposes trigger patterns, gets user approval, and writes `<skill_root>/autviam_c_config.json`.
 
 **What the config enables:**
-- `domain_reviewer.specialists` — Codex `explorer` prompt profiles ExecPhase dispatches during Gate B when the diff touches matching files. Each specialist's findings carry the same weight as the domain reviewer's own findings.
+- `domain_reviewer.specialists` — Codex `explorer` prompt profiles used as extra review lenses during Gate B when the diff touches matching files. Each specialist's findings carry the same weight as the domain reviewer's own findings. **By default the domain reviewer applies each lens inline** (reading its `prompt_file`) rather than `spawn_agent`-ing a separate agent — nested dispatch is usually unavailable in inline mode. See `agents/autviam-domain-reviewer.md`.
 - `spec_reviewer.specialists` — Codex `explorer` prompt profiles dispatched during Gate A (rare; most repos leave this empty).
 - `implementer.skills` — skills surfaced to the implementer template when matching files changed.
 
 **Runtime mechanics (deterministic — no LLM at trigger time):**
 
-Before dispatching the domain reviewer, ExecPhase runs:
+Before dispatching the domain reviewer, ExecPhase/ExecTask runs:
 ```bash
-git diff --name-only <base_sha>..<head_sha> \
-  | grep -E '<trigger_pattern>'
+<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json domain_reviewer.specialists <base_sha> <head_sha>
 ```
-for each configured specialist. Only specialists with at least one matching file are included
-in the `specialist_agents` list injected into the domain reviewer prompt. An empty list means
-standard review — fully backward compatible with repos that have no config.
+which emits the JSON array of config entries whose `trigger_patterns` match at least one file in
+`git diff --name-only <base_sha>..<head_sha>` (OR logic). That array is the `specialist_agents` list
+injected into the domain reviewer prompt. An empty array (no config, empty section, or no match) means
+standard review — fully backward compatible with repos that have no config. The implementer skill check
+and Gate A spec-reviewer specialist check use the same script with the `implementer.skills` /
+`spec_reviewer.specialists` section.
 
 **The config is repo-local.** It is never part of the upstream AutViam_C skill definition.
 Template: `templates/autviam_c_config_template.json`.

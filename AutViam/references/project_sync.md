@@ -44,7 +44,7 @@ Name â†’ number resolution is `gh project list --owner <owner> --format json` â†
 
 ```json
 "project": {
-  "owner": "SOSOVSKI", "number": 4,
+  "owner": "REPO_OWNER", "number": "Project_N",
   "overview_item": "PVTI_...",
   "phase_items": { "1": "PVTI_...", "2": "PVTI_..." }
 }

@@ -44,7 +44,7 @@ Board resolution reads `<skill_root>/autviam_c_config.json` → `project` (the s
 
 ```json
 "project": {
-  "owner": "SOSOVSKI", "number": 4,
+  "owner": "REPO_OWNER", "number": "Project_N",
   "overview_item": "PVTI_...",
   "phase_items": { "1": "PVTI_...", "2": "PVTI_..." }
 }
@@ -58,7 +58,7 @@ The `project`-block bookkeeping and the Gate/board-resolution above are now auto
 
 | AutViam_C step | `project_sync.sh` call |
 |---|---|
-| Plan-2-Tasks, after creating issues (§ 7h) | `project_sync.sh add <map> <config> overview <overview_issue_url> --slug <slug>`; per phase `project_sync.sh add <map> <config> phase:<N> <phase_issue_url> --slug <slug> --phase <N>` (Repo auto-populates from the built-in **Repository** field; item ids cached automatically) |
+| Plan-2-Tasks, after creating issues (§ 7g) | `project_sync.sh add <map> <config> overview <overview_issue_url> --slug <slug>`; per phase `project_sync.sh add <map> <config> phase:<N> <phase_issue_url> --slug <slug> --phase <N>` (Repo auto-populates from the built-in **Repository** field; item ids cached automatically) |
 | ScaffoldPhase Step 8 (scaffolded) | `project_sync.sh status <map> phase:<N> Todo` |
 | ExecPhase Step 10b (phase done + close) | `project_sync.sh status <map> phase:<N> Done` |
 | ExecPhase Step 7 (gate-cap-hit) | `project_sync.sh status <map> phase:<N> Blocked` |

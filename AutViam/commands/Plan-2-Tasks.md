@@ -6,6 +6,17 @@ Convert a plan into granular tasks, set up tracking, and create the GitHub plan 
 
 ---
 
+## Step 0 — Plan worktree (branch + worktree + plan copy)
+
+Before writing any artifact, set up the plan's isolated worktree so every derived file lands on the plan branch (SKILL.md § Branch & Worktree Model). Pre-check with `git rev-parse --show-toplevel` — if this isn't a git repo, **skip Step 0** and operate in place under `dev/plans/<stem>/` on the current branch (note the skip in the final summary).
+
+1. **Slug:** → `<skill_root>/scripts/init_plan.sh slug <plan_file>` (prints `<plan_slug>`; reuse it in Step 7 — no need to re-derive).
+2. **Ensure the plan branch** (idempotent — `gen-plan` usually created it; this covers hand-written plans that skipped `gen-plan`): → `<skill_root>/scripts/phase_git.sh plan-branch <plan_slug>`.
+3. **Worktree:** → `<skill_root>/scripts/phase_git.sh worktree <plan_slug>` (prints `<worktree>` = `<repo-parent>/WorkTrees/<repo>-<plan_slug>`, checked out on `<plan_slug>`).
+4. **Copy the plan in** (a copy — the original is left untouched, intentionally): copy `<plan_file>` to `<worktree>/dev/plans/<stem>.md` (canonical, beside the folder) **and** into `<worktree>/dev/plans/<stem>/`; copy its `-plan.html` companion too if it exists.
+5. **Operate inside the worktree from here on.** Every path below — `<tasks_folder>` = `<worktree>/dev/plans/<stem>/`, the issue map, tracker, gates, summaries, scratch — resolves under `<worktree>`. The main checkout stays put.
+6. **Keep transients out of git:** write `<tasks_folder>/.gitignore` containing `scratch/` and `diagrams/`.
+
 ## Step 1 — Read the plan once
 
 This is the **only** command in the pipeline that reads `<plan_file>` in full. Extract:
@@ -39,7 +50,7 @@ Verify:
 
 ## Step 4 — Create task JSONs
 
-First scaffold the per-plan folders: → run `<skill_root>/scripts/init_plan.sh dirs <tasks_folder>` (makes `<tasks_folder>/{json,gates,reviews}` — this covers Step 4's `json/`, ExecPhase's `gates/`, and the `reviews/` folder in one call).
+First scaffold the per-plan folders: → run `<skill_root>/scripts/init_plan.sh dirs <tasks_folder>` (makes `<tasks_folder>/{json,gates,reviews,scratch}` — this covers Step 4's `json/`, ExecPhase's `gates/`, the `reviews/` folder, and the gitignored `scratch/` for transient issue-body files, in one call).
 
 For each task, create `<tasks_folder>/json/<task_id>.json` from `templates/template.json`.
 
@@ -85,17 +96,17 @@ The label taxonomy it ensures (reference — colors/descriptions live in the scr
 
 ### 7b. Plan overview issue
 
-Render `templates/plan_overview_issue.md` to `/tmp/plan_overview_body.md` (the body stays LLM-authored), then:
+Render `templates/plan_overview_issue.md` to `<tasks_folder>/scratch/plan_overview_body.md` (the body stays LLM-authored), then:
 
-→ `num=$(<skill_root>/scripts/init_plan.sh create-issue --title "📋 [<slug>] Plan: <plan_name>" --labels "plan-issue,plan:<slug>" --body-file /tmp/plan_overview_body.md)`
+→ `num=$(<skill_root>/scripts/init_plan.sh create-issue --title "📋 [<slug>] Plan: <plan_name>" --labels "plan-issue,plan:<slug>" --body-file <tasks_folder>/scratch/plan_overview_body.md)`
 
 `create-issue` prints the new issue NUMBER on stdout — capture it as the overview issue number.
 
 ### 7c. Phase issues (one per phase, in order)
 
-Render `templates/phase_skeleton_issue.md` per phase to `/tmp/phase_<N>_body.md` (LLM-authored body), then per phase:
+Render `templates/phase_skeleton_issue.md` per phase to `<tasks_folder>/scratch/phase_<N>_body.md` (LLM-authored body), then per phase:
 
-→ `<skill_root>/scripts/init_plan.sh create-issue --title "[<slug>] Phase <N>: <phase_name>" --labels "phase-issue,phase-<N>,not-scaffolded,plan:<slug>" --body-file /tmp/phase_<N>_body.md`
+→ `<skill_root>/scripts/init_plan.sh create-issue --title "[<slug>] Phase <N>: <phase_name>" --labels "phase-issue,phase-<N>,not-scaffolded,plan:<slug>" --body-file <tasks_folder>/scratch/phase_<N>_body.md`
 
 Capture each printed issue number (keyed by phase `<N>`) for §7d/§7e.
 
@@ -104,9 +115,9 @@ Capture each printed issue number (keyed by phase `<N>`) for §7d/§7e.
 The plan overview was created with `#<phase_issue_number>` placeholders. Replace them with real numbers using the canonical roundtrip in `references/issue_body_updates.md` — fetch once, MultiEdit all placeholders in one pass, push once:
 
 1. `<skill_root>/scripts/issue_body.sh fetch <overview_issue>` → body to stdout.
-2. `Write` the body to `/tmp/issue_<overview_issue>_body.md`.
+2. `Write` the body to `<tasks_folder>/scratch/issue_<overview_issue>_body.md`.
 3. `MultiEdit` that file: replace every `#<phase_issue_number>` placeholder with the real number from §7c (one MultiEdit, N edits — never `sed -i`).
-4. `<skill_root>/scripts/issue_body.sh push <overview_issue> /tmp/issue_<overview_issue>_body.md`.
+4. `<skill_root>/scripts/issue_body.sh push <overview_issue> <tasks_folder>/scratch/issue_<overview_issue>_body.md`.
 
 ### 7e. Save the issue map
 
@@ -143,6 +154,15 @@ Add the overview issue and each phase issue to the GitHub Project board via `pro
 ```
 
 `project_sync.sh` self-gates on `autviam_config.json` → `project` (returns OFF and no-ops when `"disable"`/absent), is idempotent (skips an item already cached in the map's `project` block), and is best-effort (logs + skips on any failure, never blocks). It resolves the board, sets Plan/Phase (the built-in **Repository** field auto-populates), and writes the `project` block (`owner`, `number`, `overview_item`, `phase_items`) into `github_issue_map.json` itself, so Scaffold/ExecPhase reuse the item ids — no manual board resolution or project-block authoring. Background: `references/project_sync.md`.
+
+## Step 8 — Commit the plan artifacts on the plan branch
+
+Inside the worktree, commit the derived artifacts so the plan branch has a **clean tree** — `ScaffoldPhase` forks phase branches from `<plan_slug>` and `phase_git.sh branch` refuses a dirty tree:
+
+→ `git -C <worktree> add dev/plans/<stem> dev/plans/<stem>.md`
+→ `git -C <worktree> commit -m "AutViam: decompose plan <plan_slug> (tasks, tracker, context, issue map)"`
+
+Best-effort: if there is nothing to commit, skip. `scratch/` and `diagrams/` are gitignored (Step 0.6), so they stay out of the commit. (Skipped entirely when Step 0 was skipped — no worktree, no plan branch.)
 
 ---
 

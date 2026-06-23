@@ -75,34 +75,25 @@ Emit only this structure. The orchestrator parses your output.
 
 ---
 
-## Specialist dispatch (optional — only when `specialist_agents` is provided)
+## Specialist lenses (only when `specialist_agents` is provided)
 
-If `specialist_agents` is present in your input and non-empty, dispatch each specialist
-**after** reading the diff but **before** scoring. Specialists are pre-filtered by the
-caller — every entry in the list is already confirmed to match the diff.
+Each entry in `specialist_agents` is pre-filtered by the caller (already matches the diff) and names an `agent` — an installed reviewer whose definition lives at `.claude/agents/<agent>.md` (some configs also add an explicit `prompt_file`). That definition is the lens.
 
-For each specialist:
+**Default: apply each lens INLINE — do not dispatch.** You are almost always a dispatched subagent yourself, and in stock Claude Code a subagent cannot spawn further subagents (nested dispatch is blocked). So trying to `Agent(...)` a specialist fails — which is why configured specialists like `gpu-kernel-reviewer`/`numerical-verifier` look "configured but not dispatchable." Instead, **after** reading the diff and **before** scoring, for each specialist: read its definition (`.claude/agents/<specialist.agent>.md`, or `<specialist.prompt_file>` if the entry has one), adopt that review focus (GPU-kernel correctness, numerical/physics consistency, …), and walk the diff again through that lens. Fold its findings into your Issues list with `[via <name> · inline]` attribution and the same severity scale (minor=1, medium=2, high/critical=auto-fail).
+
+**Only dispatch as separate agents** when you are certain you're running at the top level with nesting available (e.g. an orchestrator that already probed it):
 
 ```
-Agent(
-  subagent_type="<specialist.agent>",
-  prompt="""
+Agent(subagent_type="<specialist.agent>", prompt="""
 Reviewing the diff for task <task_id>. Changed files in scope:
 <list from git diff --name-only>
-
-task_json_path: <task_json_path>
-base_sha: <base_sha>
-head_sha: <head_sha>
-
-Please review for issues within your domain and return your standard report.
-"""
-)
+task_json_path: <task_json_path>  base_sha: <base_sha>  head_sha: <head_sha>
+Review for issues within your domain and return your standard report.
+""")
 ```
+Incorporate each report's FAIL / high / critical findings with `[via <name>]`, same severity scale.
 
-Parse each specialist's report:
-- Any FAIL, or any high/critical finding, carries the same weight as if you found it yourself.
-- Incorporate findings into your Issues list with `[via <agent-name>]` attribution.
-- Deduct from score using the same severity scale (minor=1, medium=2, high/critical=auto-fail).
+If a specialist's definition file is missing/unreadable **and** you can't dispatch it, add one medium `test_gap` issue naming the un-applied lens — never silently drop it.
 
 If `specialist_agents` is absent or empty, skip this section entirely — fully backward
 compatible with repos that have no `autviam_config.json`.

@@ -2,7 +2,7 @@
 
 Snapshot a module's (or a just-implemented feature's) architecture as a **durable** themed page plus a **token-lean markdown digest** that planning (yours or `gen-plan`'s) can cheaply re-read. Uses the frozen report shell (read `references/report_shell.md`) and the opt-in Mermaid module (read `references/mermaid_module.md`) for the topology overview. No aesthetic choice, no `surf` images.
 
-Unlike the transient reports (`diff-review`, `plan-review`, `fact-check` → `~/.agent/diagrams/`), architecture output is a **planning asset**: it persists in-repo under `dev/architecture/` so it can aid the next plan.
+Unlike the transient reports (`diff-review`, `plan-review`, `fact-check` → `dev/diagrams/`), architecture output is a **planning asset**: it persists in-repo under `dev/architecture/` so it can aid the next plan.
 
 **Two modes**, detected from `$@`:
 
@@ -79,4 +79,4 @@ Refresh after structural change: /AutViam arch <paths>   (or  arch --feature <pl
 
 **Slug derivation:** `--name` if given; else feature-mode → the plan stem; else snapshot-mode → a kebab slug of the common path (e.g. `services/logic_loom_api/assistant` → `assistant`), de-collided with a short suffix if `dev/architecture/<slug>.*` already exists for a *different* scope. Re-running the same scope **overwrites** in place — the digest is meant to be refreshed, not accumulated.
 
-**Why durable + digest:** the snapshot's job is to feed the *next* plan. A transient HTML in `~/.agent/diagrams/` can't be re-read by `gen-plan`; an in-repo digest can, at a fraction of the tokens of re-deriving the architecture from source every plan. The HTML keeps the same facts human-legible and shareable.
+**Why durable + digest:** the snapshot's job is to feed the *next* plan. A transient HTML in `dev/diagrams/` can't be re-read by `gen-plan`; an in-repo digest can, at a fraction of the tokens of re-deriving the architecture from source every plan. The HTML keeps the same facts human-legible and shareable.

@@ -136,26 +136,49 @@ Re-run '/AutViam install' any time to update.
 ExecPhase/ExecTask pick up the config automatically — no restart needed.
 ```
 
-## Step 6 — Install the bundled scripts (deterministic)
+## Step 6 — Scripts (no copy needed — single location)
 
-Copy the bundled helper scripts into the host repo at a stable repo-local path. The command files already invoke them from `<skill_root>/scripts/` (so they work even without this step); this copy also places them under `.claude/scripts/`, where `references/project_sync.md` expects `update_tracker.sh`. The set: `project_sync.sh` (gated Project writer) + `update_tracker.sh` (the Project primitive it wraps), `init_plan.sh` (slug/dirs/labels/issues/map), `issue_body.sh` (issue-body roundtrip), `gate_state.py` (gate counting + task-JSON writeback), `phase_git.sh` (branch + rollback), `match_specialists.sh` (config-driven specialist matching).
+The bundled scripts already live at `<skill_root>/scripts/` (`.claude/skills/AutViam/scripts/`) — distribution placed them there, and that is the **single** copy everything uses:
+- command files call them as `<skill_root>/scripts/<name>`;
+- `project_sync.sh` finds its sibling `update_tracker.sh` in the same dir (`$HERE/update_tracker.sh`);
+- the Step 7 hook points at `<skill_root>/scripts/phase-close.sh`, which resolves its siblings (`issue_body.sh`, `project_sync.sh`, `draft_pr.sh`) from that dir too.
 
-```bash
-mkdir -p .claude/scripts
-for s in <skill_root>/scripts/*; do
-  base="$(basename "$s")"
-  if [ -e ".claude/scripts/$base" ]; then
-    # Don't clobber a repo-customized copy — drop a .new alongside for the user to diff.
-    cp "$s" ".claude/scripts/$base.new"
-    echo "$base already present — wrote .claude/scripts/$base.new (diff and merge manually)."
-  else
-    cp "$s" ".claude/scripts/$base"; chmod +x ".claude/scripts/$base"
-    echo "Installed .claude/scripts/$base"
-  fi
-done
+There is **no second `.claude/scripts/` copy** — one location, nothing to keep in sync. If you use the GitHub Project board and want fixed defaults, drop an optional `tracker.env` (`TRACKER_OWNER`/`TRACKER_NUMBER`) **beside** `update_tracker.sh` at `<skill_root>/scripts/tracker.env`; otherwise `project_sync.sh` resolves the board from `autviam_config.json` → `project`.
+
+The scripts are best-effort / safe: the GitHub & Project scripts no-op unless `gh` is authenticated (and Project sync stays off until `autviam_config.json` → `project` names a board); the rest only run when a command invokes them, and never block a phase on failure.
+
+## Step 7 — Wire the phase-close backstop hook (optional)
+
+`scripts/phase-close.sh` is a **PostToolUse backstop**: when ExecPhase writes a `Handoff_Phase_<N>.md`, it finalizes the just-completed phase (closes the phase issue, sets its Project item to Done) even if the in-band Step 10b close was interrupted. It is idempotent with the in-band path and a silent no-op for every non-handoff write, so it is safe to leave always-on.
+
+Wire it once per repo as a PostToolUse hook on `Edit|Write` in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/skills/AutViam/scripts/phase-close.sh\"", "timeout": 30 }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-All are best-effort / safe: the GitHub & Project scripts no-op unless `gh` is authenticated (and Project sync stays fully off until `autviam_config.json` → `project` names a board); the rest only run when a command invokes them, and never block a phase on failure.
+Using `$CLAUDE_PROJECT_DIR` (not a relative path) keeps the hook resolving correctly from any working directory, including a plan worktree. Skipping this step breaks nothing — ExecPhase Step 10b still closes phases in-band; the hook only adds a backstop for interrupted runs. Verify with `printf '{"tool_input":{"file_path":"/tmp/x.py"}}' | bash .claude/skills/AutViam/scripts/phase-close.sh; echo $?` → prints `0` and nothing else.
+
+**Merge-method labels + repo settings (one-time, best-effort).** The draft PRs `phase-close.sh`/ExecPhase open are labelled `merge:commit` (phase→plan) and `merge:squash` (plan→main) — GitHub can't pin a per-PR merge method, so the label records intent for the eventual `gh pr merge --merge`/`--squash`. Create the labels and allow both methods on the repo:
+
+```bash
+gh label create merge:commit --color 1d76db --description "AutViam: merge-commit this PR at merge time" --force
+gh label create merge:squash --color 0e8a16 --description "AutViam: squash this PR at merge time" --force
+gh api -X PATCH "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)" -F allow_merge_commit=true -F allow_squash_merge=true >/dev/null 2>&1 || true
+```
+
+(The labels also auto-create on first PR; the repo-settings PATCH needs admin and is best-effort.)
 
 ## Notes
 

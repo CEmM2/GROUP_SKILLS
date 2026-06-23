@@ -4,7 +4,7 @@ Explain **something that exists in this codebase** — a symbol, file, flow, or 
 
 **Inputs:** `$@` — what to explain. A symbol (`resolveApiBase`), a file (`src/api/client.ts`), a flow ("how the sidecar handshake works"), or a concept ("how AKMS gating degrades gracefully").
 
-**Output is transient** — `~/.agent/diagrams/<slug>.html`, an understanding aid, not a planning asset. (For a durable, reusable module/feature snapshot, use `AutViam_C arch` instead — it writes to `dev/architecture/` with a planning digest.)
+**Output is transient** — `dev/diagrams/<slug>.html`, an understanding aid, not a planning asset. (For a durable, reusable module/feature snapshot, use `AutViam_C arch` instead — it writes to `dev/architecture/` with a planning digest.)
 
 ---
 
@@ -49,7 +49,7 @@ Build one self-contained `.html` per the frozen shell:
 3. **Key nodes** — a short list or compact `.tbl-scroll`: each box → `file:line` + one-line what-it-does, so the diagram is traceable back to code.
 4. **Gotchas** (only if real) — a `.callout` for non-obvious coupling, ordering dependencies, or the degrade-gracefully branch the diagram implies.
 
-Keep it to what answers the question — `explain` is a focused aid, not a full report. Write to `~/.agent/diagrams/<slug>.html`, open it, tell the user the path.
+Keep it to what answers the question — `explain` is a focused aid, not a full report. Write to `dev/diagrams/<slug>.html`, open it, tell the user the path.
 
 ---
 

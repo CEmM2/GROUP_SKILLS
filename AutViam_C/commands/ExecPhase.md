@@ -33,9 +33,9 @@ Apply the Codex agent assignment rule from SKILL.md § Codex Agent Assignment �
 
 ## Step 3 — Branch setup
 
-→ `<skill_root>/scripts/phase_git.sh branch <plan_slug> <phase_id> [--from <parent_branch>]`
+→ `<skill_root>/scripts/phase_git.sh branch <plan_slug> <phase_id> --from <plan_slug>`
 
-It checks out `<plan_slug>_phase-<phase_id>` (creating it from `<parent_branch>` if given, else from current HEAD), **refuses on a dirty working tree** (commit/stash first, or pass `--force`), and prints the branch name. Never implement on `main`/`master` without explicit user consent.
+It checks out `<plan_slug>_phase-<phase_id>`, creating it from the **plan branch** `<plan_slug>` when new (so the phase merges cleanly back into it — SKILL.md § Branch & Worktree Model), **refuses on a dirty working tree** (commit/stash first, or pass `--force`), and prints the branch name. (When Plan-2-Tasks ran without a worktree, `<plan_slug>` may not exist — fall back to `--from <parent_branch>`, else current HEAD.) Never implement on `main`/`master` without explicit user consent.
 
 ## Step 4 — Execution order
 
@@ -139,6 +139,8 @@ On FAIL: record the failure entry (JSON block with `gate:"B"`, `result:"fail"`),
 Run task-relevant tests fresh. Apply the Iron Law:
 
 > Identify the command → run it fresh → read full output → pass = ≥ 95% on task-relevant tests → record exact counts in the gates file. No "should pass" / "probably works" claims.
+
+**In worktree mode:** run the tests against the **main checkout's** environment, importing the **worktree's** source — the worktree's own `uv`/`.venv` is usually missing/broken. E.g. `PYTHONPATH=<worktree> <main_checkout>/.venv/bin/python -m pytest <task tests>` (or `cd <main_checkout> && PYTHONPATH=<worktree> uv run pytest …`). Don't `uv sync` a fresh venv inside the worktree. (SKILL.md § Branch & Worktree Model.)
 
 On FAIL: record the failure entry (JSON block with `gate:"C"`, `result:"fail"`), then run `gate_state.py cap-check … <task_id> C` (→ Step 7 on `CAP-HIT`) and `gate_state.py sync-counters … <task_id>`. Return to implementer with actual test output. On PASS, the Gate C JSON block records `result:"pass"` + the `commit` SHA — `gate_state.py last-good-sha` reads these for rollback.
 
@@ -249,27 +251,36 @@ Keep this section compact. It is a session-reset aid, not a full report; detaile
 Per `references/issue_body_updates.md`:
 
 1. → `<skill_root>/scripts/issue_body.sh fetch <phase_issue>` (prints the body).
-2. Materialise the captured body to `/tmp/phase_<N>_body.md` with a Codex file-editing tool.
+2. Materialise the captured body to `<tasks_folder>/scratch/phase_<N>_body.md` with a Codex file-editing tool.
 3. In the temp file, replace `- [ ] <task_id>` → `- [x] <task_id>` for each task ID in `completed_this_phase`.
-4. → `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label in-progress --add-label done --state closed` — body update, label swap, and close in one call.
+4. → `<skill_root>/scripts/issue_body.sh push <phase_issue> <tasks_folder>/scratch/phase_<N>_body.md --remove-label in-progress --add-label done --state closed` — body update, label swap, and close in one call.
 
 **Project sync (gated):** set the phase item's Status to `Done` — self-gated/best-effort (`references/project_sync.md`):
 ```bash
 <skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json phase:<N> Done
 ```
+(The `phase-close.sh` PostToolUse backstop also performs this set when 10b's in-band call is skipped — they're idempotent.)
 
 ### 10c. Plan overview checkbox
 
 Per `references/issue_body_updates.md`:
 
 1. → `<skill_root>/scripts/issue_body.sh fetch <plan_overview_issue>` (prints the body).
-2. Materialise the captured body to `/tmp/overview_body.md` with a Codex file-editing tool.
+2. Materialise the captured body to `<tasks_folder>/scratch/overview_body.md` with a Codex file-editing tool.
 3. In the temp file, replace `- [ ] Phase <N>: <phase_name> (<task_count> tasks) — #<phase_issue>` → `- [x] ...`
-4. → `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> /tmp/overview_body.md`
+4. → `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> <tasks_folder>/scratch/overview_body.md`
 
 **Project sync (gated, final phase only):** on the last phase, also set the overview item's Status to `Done` (`references/project_sync.md`): `<skill_root>/scripts/project_sync.sh status <tasks_folder>/github_issue_map.json overview Done`.
 
-**Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
+### 10d. Draft PR (phase branch → plan branch)
+
+Open the phase's draft PR (idempotent — a handoff *update* rides the existing PR, so re-running does nothing). The `phase-close.sh` backstop fires this too on the handoff write; this in-band call is the primary path:
+
+→ `<skill_root>/scripts/draft_pr.sh phase <tasks_folder>/github_issue_map.json <phase_id> <tasks_folder>/Handoff_Phase_<phase_id+1>.md` — pushes `<plan_slug>_phase-<phase_id>`, opens a draft PR into `<plan_slug>` labelled `merge:commit`, body = this phase's completion-summary section + a repo-relative link to the handoff. gh-gated / best-effort.
+
+**Final phase only:** also open the plan → main draft PR → `<skill_root>/scripts/draft_pr.sh plan <tasks_folder>/github_issue_map.json <tasks_folder>/Handoff_Phase_<phase_id+1>.md` (head `<plan_slug>`, base `main`, label `merge:squash`).
+
+**Total `gh` budget for phase handoff: 4 calls** (1 phase view, 1 combined phase edit+close, 1 overview view, 1 overview edit) + 1 best-effort draft-PR open when a remote is set (+1 more on the final phase for the plan→main PR). Compare to Aut_Faciam's 2 + 2N for per-task flips during the phase.
 
 ---
 

@@ -5,9 +5,9 @@ Use this exact 4-step pattern for every fetch-modify-update of an issue body. Ne
 ## The 4 steps
 
 1. **Fetch** (1 Bash call): `gh issue view <issue_number> --json body -q .body` — capture stdout directly. Do **not** redirect to a file in the shell; capture from the tool result.
-2. **Materialise** (Write tool): save the captured body to `/tmp/issue_<N>_body.md`.
+2. **Materialise** (Write tool): save the captured body to `<tasks_folder>/scratch/issue_<N>_body.md`.
 3. **Mutate** (Edit / MultiEdit tool): apply exact-string replacements. Disambiguate matches with surrounding context (e.g. include `#<N>` in `old_string` for checkbox flips). For structural rewrites with no stable anchor, render the new body with `Write` instead.
-4. **Push back** (1 Bash call): `gh issue edit <issue_number> --body-file /tmp/issue_<N>_body.md`.
+4. **Push back** (1 Bash call): `gh issue edit <issue_number> --body-file <tasks_folder>/scratch/issue_<N>_body.md`.
 
 **Budget:** exactly 2 Bash calls per body update (one read, one write). Everything else is tool-driven and autonomous.
 

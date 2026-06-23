@@ -1,6 +1,6 @@
 # Credits & third-party attribution
 
-AutViam's report layer borrows from the **visual-explainer** skill by **Nico Bailon**
+AutViam_C's report layer borrows from the **visual-explainer** skill by **Nico Bailon**
 (GitHub: [`nicobailon`](https://github.com/nicobailon)), used under the MIT License.
 
 ## What was borrowed
@@ -8,7 +8,7 @@ AutViam's report layer borrows from the **visual-explainer** skill by **Nico Bai
 - **`references/mermaid_module.md`** — the zoom / pan / fit / expand Mermaid diagram
   engine (the `.diagram-shell` HTML structure, the CSS chrome, and the interaction
   module) is adapted from visual-explainer's `templates/mermaid-flowchart.html`.
-  AutViam's changes: the Mermaid `themeVariables` are read from the frozen
+  AutViam_C's changes: the Mermaid `themeVariables` are read from the frozen
   `templates/report_theme.css` palette via `getComputedStyle` instead of being
   hard-coded, and a `data-theme` `MutationObserver` re-renders every diagram when the
   ◐ theme toggle flips.
@@ -17,7 +17,7 @@ AutViam's report layer borrows from the **visual-explainer** skill by **Nico Bai
   the `<br/>`-not-`\n` and `stateDiagram-v2` label caveats, the hybrid-pattern rule
   for 15+ nodes) distills visual-explainer's `SKILL.md` and CSS-patterns guidance.
 
-AutViam's own work — not borrowed: the frozen report theme (`report_theme.css`, pinned
+AutViam_C's own work — not borrowed: the frozen report theme (`report_theme.css`, pinned
 from the AKMS "Seuss" theme) and shell (`report_shell.md`), and the `arch` / `explain`
 commands (repo-grounded, fact-checked, durable planning digests).
 

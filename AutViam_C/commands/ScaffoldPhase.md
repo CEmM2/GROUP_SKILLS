@@ -19,6 +19,14 @@ Read:
 - `<tasks_folder>/all-tasks.md` — to identify tasks in this phase
 - Each task JSON's `plan_lines` field, then read only those line ranges from `<plan_file>`. Never read the plan in full.
 
+## Step 1b — Switch to the phase branch
+
+Always scaffold phase `<phase_id>` on its own branch, forked from the plan branch (SKILL.md § Branch & Worktree Model). Inside the plan worktree (checked out on `<plan_slug>`):
+
+→ `<skill_root>/scripts/phase_git.sh branch <plan_slug> <phase_id> --from <plan_slug>` — checks out `<plan_slug>_phase-<phase_id>` (creating it from the plan branch when new; refuses on a dirty tree — commit/stash first). `<plan_slug>` is in `github_issue_map.json`; if no map exists, derive it with `<skill_root>/scripts/init_plan.sh slug <plan_file>`.
+
+(Skip when Plan-2-Tasks ran without a worktree/plan branch — scaffold on the current branch.)
+
 ## Step 2 — Discover existing tests **once**
 
 Run a single file search for `tests/**/*.py` and take the first 60 results. Group by top-level subdirectory (e.g. `tests/unit/`, `tests/integration/`). Build a one-paragraph "test layout summary" string:
@@ -155,7 +163,7 @@ Print this summary to the console.
 
 **Pre-check:** `gh auth status`. If unavailable, skip Step 8 — all local artifacts are already complete.
 
-Render the populated body from `templates/phase_populated_issue.md` to `/tmp/phase_<N>_body.md`. The body's `### Tasks` section lists every task as a checkbox referencing the task ID and title:
+Render the populated body from `templates/phase_populated_issue.md` to `<tasks_folder>/scratch/phase_<N>_body.md`. The body's `### Tasks` section lists every task as a checkbox referencing the task ID and title:
 
 ```
 - [ ] P<N>-1 — <task_title>
@@ -166,7 +174,7 @@ There are no task issue numbers — the checkbox text is the only identifier. Ex
 
 Push the body and swap labels in a single call:
 
-→ `<skill_root>/scripts/issue_body.sh push <phase_issue> /tmp/phase_<N>_body.md --remove-label not-scaffolded --add-label scaffolded`
+→ `<skill_root>/scripts/issue_body.sh push <phase_issue> <tasks_folder>/scratch/phase_<N>_body.md --remove-label not-scaffolded --add-label scaffolded`
 
 (One `gh` call: body update + label swap together. The script skips and exits 3 if `gh` is unauthenticated.)
 

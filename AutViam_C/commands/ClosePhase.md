@@ -25,7 +25,7 @@ Skip if the phase issue is already closed (check the state first). Otherwise swa
 → `<skill_root>/scripts/issue_body.sh close <phase_issue> --remove in-progress --add done --comment "Phase <N> completed manually — closed via AutViam_C close-phase."`
 
 Tick the phase's checkbox in the plan-overview body per `references/issue_body_updates.md`:
-→ `<skill_root>/scripts/issue_body.sh fetch <plan_overview_issue>` → Write `/tmp/overview_body.md` → Edit the checkbox → `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> /tmp/overview_body.md`.
+→ `<skill_root>/scripts/issue_body.sh fetch <plan_overview_issue>` → Write `<tasks_folder>/scratch/overview_body.md` → Edit the checkbox → `<skill_root>/scripts/issue_body.sh push <plan_overview_issue> <tasks_folder>/scratch/overview_body.md`.
 
 ## Step 4 — Project sync (gated)
 

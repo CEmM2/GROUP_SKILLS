@@ -48,6 +48,7 @@ skills/<skill-name>/
 ### SKILL.md Naming
 - Frontmatter `name:` field should match directory name
 - Use lowercase with hyphens: `taichi-gpu-sim` (NOT `TaichiGPUSim`)
+- **Exception — product-named pipeline skills:** standalone, branded pipeline skills may keep a PascalCase / underscore product name (e.g. `AutViam`, `AutViam_C`) **provided the frontmatter `name:` matches the directory name exactly**, so the AGENTS.md registry stays consistent. This is a deliberate, narrow carve-out for product identity — not a license to use mixed case for ordinary reference or domain skills.
 
 ### Example Files
 - **Good examples:** `good-*.py` or `*-example.py`
@@ -350,7 +351,7 @@ Example:
 |---------|-----------|---------|
 | File names | lowercase-with-hyphens | `kernel-patterns.md` |
 | Directory names | lowercase, plural for collections | `references/`, `examples/` |
-| Skill names | lowercase-with-hyphens | `taichi-gpu-sim` |
+| Skill names | lowercase-with-hyphens (exception: product-named pipelines) | `taichi-gpu-sim`, `AutViam` |
 | Code blocks | Always specify language | ` ```python ` |
 | Headings | Descriptive, proper hierarchy | `## Performance Considerations` |
 | Links (internal) | Backticks for files | `` `references/file.md` `` |

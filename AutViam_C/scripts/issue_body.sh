@@ -8,12 +8,12 @@
 # and the close/label-swap can't drift into N calls.
 #
 # Usage:
-#   issue_body.sh fetch <issue>                          # → body to stdout; LLM Writes it to /tmp/issue_<N>_body.md
+#   issue_body.sh fetch <issue>                          # → body to stdout; LLM Writes it to <tasks_folder>/scratch/issue_<N>_body.md
 #   issue_body.sh push  <issue> <body_file> [gh flags…]  # gh issue edit --body-file + extra flags
 #   issue_body.sh label <issue> [--add L]… [--remove L]… # label-only edit (no body)
 #
 # push flag examples (phase close in ONE call):
-#   issue_body.sh push 11 /tmp/issue_11_body.md --remove-label in-progress --add-label done --state closed
+#   issue_body.sh push 11 <tasks_folder>/scratch/issue_11_body.md --remove-label in-progress --add-label done --state closed
 # label example (gate-cap, scaffold swap):
 #   issue_body.sh label 11 --add gate-cap-hit
 #   issue_body.sh label 11 --remove not-scaffolded --add scaffolded

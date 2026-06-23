@@ -4,7 +4,7 @@ Verify the factual accuracy of a document against the actual codebase and git hi
 
 It is also the shared **verification spine** that `plan-review`, `diff-review`, and `gen-plan` run inline as their "verification fact-sheet" step.
 
-**Inputs:** `<target>` — a file path (`.md`, `.html`, or any text doc). If omitted, verify the most recently modified `.html` in `~/.agent/diagrams/` (`ls -t ~/.agent/diagrams/*.html | head -1`).
+**Inputs:** `<target>` — a file path (`.md`, `.html`, or any text doc). If omitted, verify the most recently modified `.html` in `dev/diagrams/` (`ls -t dev/diagrams/*.html | head -1`).
 
 ---
 
