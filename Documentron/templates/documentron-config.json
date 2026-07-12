@@ -1,0 +1,59 @@
+{
+  "schema_version": "1",
+  "llm_policy": {
+    "ordinary_semantic_reviews": 1,
+    "scientific_minimum_reviews": 1,
+    "independent_review_for": [
+      "equation",
+      "physical-assumption",
+      "safety",
+      "security"
+    ],
+    "maximum_reviews": 2,
+    "packet_max_bytes": 120000
+  },
+  "scientific_review": {
+    "required": true,
+    "claim_types": [
+      "algorithmic",
+      "equation",
+      "ml",
+      "numerical",
+      "physical-assumption",
+      "scientific",
+      "statistical",
+      "validation"
+    ],
+    "source_globs": [
+      "**/constitutive/**",
+      "**/fem/**",
+      "**/fft/**",
+      "**/materials/**",
+      "**/models/**",
+      "**/numerics/**",
+      "**/physics/**",
+      "**/solvers/**",
+      "**/statistics/**",
+      "**/training/**"
+    ],
+    "documentation_globs": [
+      "docs/theory/**",
+      "docs/**/numerics/**",
+      "docs/**/algorithms/**"
+    ]
+  },
+  "documentation": {
+    "roots": ["docs", "README.md"],
+    "design_doc_roots": [
+      "design_docs",
+      "dev/design_docs",
+      "docs/design",
+      "architecture"
+    ]
+  },
+  "validation": {
+    "allowlisted_commands": ["mkdocs build --strict"]
+  },
+  "specialists": [],
+  "mappings": []
+}

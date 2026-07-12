@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Documentron specialist manifest",
+  "type": "object",
+  "required": ["name", "prompt_file"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "description": {"type": "string"},
+    "prompt_file": {"type": "string"},
+    "commands": {"type": "array", "items": {"type": "string"}},
+    "claim_types": {"type": "array", "items": {"type": "string"}},
+    "source_globs": {"type": "array", "items": {"type": "string"}},
+    "documentation_globs": {"type": "array", "items": {"type": "string"}},
+    "independent": {"type": "boolean"}
+  }
+}

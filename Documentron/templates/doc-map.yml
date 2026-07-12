@@ -1,0 +1,10 @@
+surfaces: {}
+
+design_docs: []
+
+examples:
+  # - source: examples/demo.py
+  #   docs:
+  #     - docs/user/quickstart.md
+  #   tests:
+  #     - tests/test_demo.py

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Documentron semantic result",
+  "type": "object",
+  "required": ["reviews", "patches"],
+  "additionalProperties": false,
+  "properties": {
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reviewer", "verdict", "evidence_used", "lenses_applied", "claim_results"],
+        "properties": {
+          "reviewer": {"type": "string"},
+          "verdict": {
+            "enum": ["confirmed", "corrected", "contradicted", "uncertain", "unsupported"]
+          },
+          "evidence_used": {"type": "array", "items": {"type": "string"}},
+          "lenses_applied": {"type": "array", "items": {"type": "string"}},
+          "claim_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["claim_id", "verdict", "evidence_used", "findings"],
+              "properties": {
+                "claim_id": {"type": "string"},
+                "verdict": {
+                  "enum": ["confirmed", "corrected", "contradicted", "uncertain", "unsupported"]
+                },
+                "evidence_used": {"type": "array", "items": {"type": "string"}},
+                "findings": {"type": "array", "items": {"type": "object"}}
+              }
+            }
+          }
+        }
+      }
+    },
+    "patches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "old_text", "old_text_sha256", "new_text"],
+        "properties": {
+          "path": {"type": "string"},
+          "old_text": {"type": "string"},
+          "old_text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "new_text": {"type": "string"}
+        }
+      }
+    },
+    "unresolved": {"type": "array", "items": {"type": "object"}}
+  }
+}
