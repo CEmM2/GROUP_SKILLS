@@ -260,12 +260,18 @@ def extract_claims(root: Path, docs: list[str], evidence_hash: str) -> list[dict
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
+        normalized_occurrences: dict[str, int] = {}
         for start, end, block in paragraph_blocks(text):
             types = sorted({kind for kind, pattern in CLAIM_PATTERNS if pattern.search(block)})
             if not types:
                 continue
             normalized = " ".join(block.split())
-            claim_id = sha256_text(f"{doc}\0{normalized}")
+            occurrence = normalized_occurrences.get(normalized, 0)
+            normalized_occurrences[normalized] = occurrence + 1
+            claim_key = f"{doc}\0{normalized}"
+            if occurrence:
+                claim_key = f"{claim_key}\0{occurrence}"
+            claim_id = sha256_text(claim_key)
             claims.append({
                 "claim_id": claim_id,
                 "document": doc,
@@ -586,7 +592,10 @@ def markdown_links(root: Path, docs: list[str]) -> list[dict[str, Any]]:
                 target = match.group(1).split("#", 1)[0].strip()
                 if not target or target.startswith(("http://", "https://", "mailto:")):
                     continue
-                resolved = (path.parent / target).resolve()
+                if target.startswith("/"):
+                    resolved = (root / target.lstrip("/")).resolve()
+                else:
+                    resolved = (path.parent / target).resolve()
                 try:
                     resolved.relative_to(root)
                 except ValueError:
