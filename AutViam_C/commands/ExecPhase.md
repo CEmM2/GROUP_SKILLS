@@ -88,12 +88,10 @@ On the **3rd** failure of any one gate, the next attempt is the last. When `cap-
 
 ### Gate A — Spec Compliance
 
-Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-a`, then dispatch the `autviam-spec-reviewer` prompt body through exactly the returned custom profile:
+Run the resolver again with `--task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, then dispatch exactly the returned custom profile. Its installed TOML already embeds the canonical `autviam-spec-reviewer.md` behavior, so pass task data only:
 
 ```text
 spawn_agent(agent_type="<resolver.agent>", message="""
-Use `<skill_root>/agents/autviam-spec-reviewer.md` as your prompt profile.
-
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>
@@ -117,12 +115,10 @@ It prints the JSON array of `domain_reviewer.specialists` entries whose `trigger
 Use the array as `specialist_agents`. If it is empty, omit the field from the prompt
 (backward compatible — reviewer skips the specialist section entirely).
 
-Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-b`, then dispatch the `autviam-domain-reviewer` prompt body through exactly the returned custom profile:
+Run the resolver again with `--task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`, then dispatch exactly the returned custom profile. Its installed TOML already embeds the canonical `autviam-domain-reviewer.md` behavior, so pass task data only:
 
 ```text
 spawn_agent(agent_type="<resolver.agent>", message="""
-Use `<skill_root>/agents/autviam-domain-reviewer.md` as your prompt profile.
-
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>

@@ -71,14 +71,14 @@ Use `references/codex-agent-routing.json` as the canonical routing policy. Compu
 Before every Codex subagent dispatch:
 
 1. For a task dispatch, identify its task JSON path; the resolver must read `task_id`, `complexity`, and `risk` directly from that file. For a phase orchestrator, use the maximum stored complexity and maximum stored risk across that phase's tasks.
-2. Select one role: `implementer`, `orchestrator`, `reviewer`, `explorer`, or `mechanical_read_only`.
+2. Select one role: `implementer`, `orchestrator`, `spec_reviewer`, `domain_reviewer`, `explorer`, or `mechanical_read_only`.
 3. For every task dispatch, invoke `<skill_root>/scripts/resolve_codex_agent.py --task-json <task-json> --role <role> --evidence-file <same-task-json> --purpose <purpose>`. Raw `--complexity/--risk` inputs are reserved for phase aggregation and diagnostics; they cannot write evidence into a task JSON.
 4. Parse the JSON output and dispatch exactly the custom profile in `agent`.
 5. Confirm the resolver atomically appended its complete output, dispatch purpose, and timestamp to the task JSON or phase routing-evidence file.
 6. Do not dispatch built-in `worker`, `explorer`, or `default` profiles. Do not substitute another model, reasoning effort, or profile. Do not inherit either setting from the parent session.
 7. Treat any resolver, profile-validation, or dispatch-availability failure as fatal. Never fall back silently.
 
-The routing JSON selects a profile. The installed `.codex/agents/*.toml` profile is the sole source of truth for model, reasoning effort, sandbox, tools, and role instructions. The bounded `mechanical_read_only` route uses Luna only for `complexity <= 2` and `risk <= 2`; larger mechanical read-only tasks route through the normal explorer tier. Reviewers never use Luna and apply the reviewer floor defined by the policy.
+The routing JSON selects a profile. Canonical Markdown in `agents/` is the sole source of truth for durable role behavior. The installer serializes that behavior into `.codex/agents/*.toml`, where the generated profile owns model, reasoning effort, sandbox, platform tool availability, and Codex-specific representation. The bounded `mechanical_read_only` route uses Luna only for `complexity <= 2` and `risk <= 2`; larger mechanical read-only tasks route through the normal explorer tier. Reviewers never use Luna and apply the reviewer floor defined by the policy.
 
 For retries and repeated gates, invoke the resolver again from the same stored scores and record a new evidence entry. Both ExecPhase and ExecTask reference this rule by name; do not duplicate or alter the policy inline.
 
@@ -129,19 +129,22 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/project_sync.md` — gated GitHub Project board sync mechanics (active only when `autviam_c_config.json` → `project` names a board). Read when wiring or refreshing Project item status.
 
 ### Codex Agent Profiles
-Three bundled Markdown prompt profiles provide the role bodies used by the runtime profile installer:
+Six canonical Markdown prompt sources provide the durable role bodies used by the runtime profile installer:
 
 | Prompt profile | Runtime role | Role | Invoked from |
 |---|---|---|
-| `autviam-spec-reviewer` | `reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
-| `autviam-domain-reviewer` | `reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
+| `autviam-implementer` | `implementer` | Implementation behavior | ScaffoldPhase, ExecPhase, ExecTask, orchestrator |
+| `autviam-spec-reviewer` | `spec_reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
+| `autviam-domain-reviewer` | `domain_reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
+| `autviam-explorer` | `explorer` | Read-only specialist work | specialist dispatch |
+| `autviam-search` | `mechanical_read_only` | Bounded mechanical search | search dispatch |
 | `autviam-phase-orchestrator` | `orchestrator` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
 
-Run `AutViam_C install` once in each consumer repository to generate the sixteen custom TOML profiles under `.codex/agents/`. The installer explicitly pins model, reasoning effort, and sandbox and then runs the exhaustive validator. Start a new Codex session after installation so the custom profiles are discoverable.
+Run `AutViam_C install` once in each consumer repository to generate the nineteen custom TOML profiles under `.codex/agents/`: four implementers, four orchestrators, three Gate A reviewers, three Gate B reviewers, four explorers, and one mechanical-search profile. The installer explicitly pins model, reasoning effort, and sandbox and then runs the exhaustive validator. Start a new Codex session after installation so the custom profiles are discoverable.
 
-At dispatch time, prepend the relevant Markdown profile content to the prompt and use only the custom `agent` returned by the resolver. Inline reviewer fallback is prohibited because it bypasses Path-2 routing evidence and independent review. If custom profile dispatch is unavailable, halt with a routing precondition failure.
+At dispatch time, use only the custom `agent` returned by the resolver and pass task-specific data only. Do not prepend or reload the canonical Markdown body: it is already embedded in the generated TOML. Inline reviewer fallback is prohibited because it bypasses Path-2 routing evidence and independent review. If custom profile dispatch is unavailable, halt with a routing precondition failure.
 
-The implementer remains template-based (`templates/task_instructions_template.md`) because per-phase context is injected per dispatch.
+The implementer's durable behavior comes from `agents/autviam-implementer.md`; `templates/task_instructions_template.md` carries only per-dispatch task and phase data.
 
 ### Bundled scripts
 
@@ -150,9 +153,9 @@ Thirteen helper scripts live at `<skill_root>/scripts/` (reference them as `<ski
 | Script | Owns |
 |---|---|
 | `expand_codex_agents.py` | Deprecated compatibility entry point; always exits nonzero and directs callers to canonical `install_agent_profiles.py`, because template-derived profiles cannot pass exact managed-source validation. |
-| `install_agent_profiles.py` | Idempotently generates the sixteen explicit runtime TOML profiles in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and role instructions. |
+| `install_agent_profiles.py` | Idempotently generates nineteen explicit runtime TOML profiles from six canonical role sources in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and Codex serialization. |
 | `resolve_codex_agent.py` | Path-2 fail-closed resolver: validates stored scores, policy, role, selected TOML, model/effort fields, sandbox, reviewer floor, and the bounded Luna route; emits machine-readable dispatch evidence. |
-| `validate_codex_agent_routing.py` | Exhaustively validates all 125 score-role combinations, the full policy matrix, every referenced profile, sandbox compatibility, reviewer floor, Luna boundary, and built-in-agent prohibition. |
+| `validate_codex_agent_routing.py` | Exhaustively validates all 150 score-role combinations, the full policy matrix, every referenced profile, exact canonical-source rendering, sandbox compatibility, reviewer floor, Luna boundary, and built-in-agent prohibition. |
 | `init_plan.sh` | Per-plan plumbing for Plan-2-Tasks Step 7: slug derivation, folder scaffolding, label diff/create, `gh issue create` (prints the number), issue-map write, task-JSON `github_issue` annotation. |
 | `issue_body.sh` | The two `gh` halves of the canonical issue-body roundtrip (`fetch` → LLM edits → `push`) plus label-only / state / close flags. The LLM still does the Edit between fetch and push — never `sed -i`. |
 | `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |

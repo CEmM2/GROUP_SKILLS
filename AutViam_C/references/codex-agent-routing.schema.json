@@ -30,11 +30,12 @@
     "profiles_by_role_and_tier": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["implementer", "orchestrator", "reviewer", "explorer"],
+      "required": ["implementer", "orchestrator", "spec_reviewer", "domain_reviewer", "explorer"],
       "properties": {
         "implementer": { "$ref": "#/$defs/tier_profiles" },
         "orchestrator": { "$ref": "#/$defs/tier_profiles" },
-        "reviewer": { "$ref": "#/$defs/tier_profiles" },
+        "spec_reviewer": { "$ref": "#/$defs/tier_profiles" },
+        "domain_reviewer": { "$ref": "#/$defs/tier_profiles" },
         "explorer": { "$ref": "#/$defs/tier_profiles" }
       }
     },

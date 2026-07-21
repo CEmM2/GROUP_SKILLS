@@ -2,7 +2,7 @@
 
 Scaffold then execute one phase, **inline in the main thread** — AutViam_C's non-nested execution path.
 
-ScaffoldPhase and ExecPhase resolve and dispatch their custom Codex profiles (role `implementer` for implementation and `reviewer` for Gates A/B) one level down from whoever runs them. Run them inline in **main** and those are **single-level** `spawn_agent` dispatches. Every dispatch still follows SKILL.md § Codex Agent Assignment and records routing evidence; built-in profiles and inline review are prohibited.
+ScaffoldPhase and ExecPhase resolve and dispatch their custom Codex profiles (role `implementer` for implementation, `spec_reviewer` for Gate A, and `domain_reviewer` for Gate B) one level down from whoever runs them. Run them inline in **main** and those are **single-level** `spawn_agent` dispatches. Every dispatch still follows SKILL.md § Codex Agent Assignment and records routing evidence; built-in profiles and inline review are prohibited.
 
 Use `phase` for "do this one phase now." For a full run, use `e2e` — it resolves the nested-dispatch mode in its Step 0 and, when nesting isn't available (the default), runs each phase via this same inline path automatically (see `E2E.md` § Nested-Dispatch capability).
 

@@ -6,9 +6,12 @@ Expected location:
     <skill_root>/scripts/install_agent_profiles.py
 
 Canonical sources:
+    <skill_root>/agents/autviam-implementer.md
     <skill_root>/agents/autviam-phase-orchestrator.md
     <skill_root>/agents/autviam-spec-reviewer.md
     <skill_root>/agents/autviam-domain-reviewer.md
+    <skill_root>/agents/autviam-explorer.md
+    <skill_root>/agents/autviam-search.md
 
 Generated runtime profiles:
     <repo_root>/.codex/agents/*.toml
@@ -39,16 +42,19 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 GENERATOR_ID = "AutViam_C/install_agent_profiles.py"
 MANAGED_MARKER = f"# AUTVIAM_C_GENERATED_AGENT_PROFILE: {GENERATOR_ID}"
 MANIFEST_NAME = "autviam-c-agent-manifest.json"
+LEGACY_PROFILE_FILENAMES = (
+    "reviewer-terra-high.toml",
+    "reviewer-sol-high.toml",
+    "reviewer-sol-xhigh.toml",
+)
 
 SOURCE_FILES = {
+    "implementer": "autviam-implementer.md",
     "orchestrator": "autviam-phase-orchestrator.md",
     "spec_reviewer": "autviam-spec-reviewer.md",
     "domain_reviewer": "autviam-domain-reviewer.md",
-}
-EXPECTED_TYPES = {
-    "orchestrator": "worker",
-    "spec_reviewer": "explorer",
-    "domain_reviewer": "explorer",
+    "explorer": "autviam-explorer.md",
+    "search": "autviam-search.md",
 }
 
 
@@ -61,7 +67,6 @@ class MarkdownProfile:
     path: Path
     name: str
     description: str
-    codex_agent_type: str
     body: str
     sha256: str
 
@@ -70,6 +75,7 @@ class MarkdownProfile:
 class RuntimeProfileSpec:
     filename: str
     name: str
+    source: str
     role: str
     model_family: str
     effort: str
@@ -78,22 +84,25 @@ class RuntimeProfileSpec:
 
 
 PROFILE_SPECS: tuple[RuntimeProfileSpec, ...] = (
-    RuntimeProfileSpec("worker-terra-medium.toml", "worker_terra_medium", "worker", "terra", "medium", "workspace-write", "AutViam_C implementation worker for routine, low-risk tasks."),
-    RuntimeProfileSpec("worker-terra-high.toml", "worker_terra_high", "worker", "terra", "high", "workspace-write", "AutViam_C implementation worker for moderate-complexity or moderate-risk tasks."),
-    RuntimeProfileSpec("worker-sol-high.toml", "worker_sol_high", "worker", "sol", "high", "workspace-write", "AutViam_C implementation worker for elevated-complexity or elevated-risk tasks."),
-    RuntimeProfileSpec("worker-sol-xhigh.toml", "worker_sol_xhigh", "worker", "sol", "xhigh", "workspace-write", "AutViam_C implementation worker for critical or exceptionally difficult tasks."),
-    RuntimeProfileSpec("orchestrator-terra-medium.toml", "orchestrator_terra_medium", "orchestrator", "terra", "medium", "workspace-write", "AutViam_C phase orchestrator for routine, low-risk phases."),
-    RuntimeProfileSpec("orchestrator-terra-high.toml", "orchestrator_terra_high", "orchestrator", "terra", "high", "workspace-write", "AutViam_C phase orchestrator for moderate-complexity or moderate-risk phases."),
-    RuntimeProfileSpec("orchestrator-sol-high.toml", "orchestrator_sol_high", "orchestrator", "sol", "high", "workspace-write", "AutViam_C phase orchestrator for elevated-complexity or elevated-risk phases."),
-    RuntimeProfileSpec("orchestrator-sol-xhigh.toml", "orchestrator_sol_xhigh", "orchestrator", "sol", "xhigh", "workspace-write", "AutViam_C phase orchestrator for critical or exceptionally difficult phases."),
-    RuntimeProfileSpec("reviewer-terra-high.toml", "reviewer_terra_high", "reviewer", "terra", "high", "read-only", "AutViam_C read-only gate reviewer for routine work."),
-    RuntimeProfileSpec("reviewer-sol-high.toml", "reviewer_sol_high", "reviewer", "sol", "high", "read-only", "AutViam_C read-only gate reviewer for moderate and elevated work."),
-    RuntimeProfileSpec("reviewer-sol-xhigh.toml", "reviewer_sol_xhigh", "reviewer", "sol", "xhigh", "read-only", "AutViam_C read-only gate reviewer for critical work."),
-    RuntimeProfileSpec("explorer-terra-medium.toml", "explorer_terra_medium", "explorer", "terra", "medium", "read-only", "Read-only repository explorer for routine evidence gathering."),
-    RuntimeProfileSpec("explorer-terra-high.toml", "explorer_terra_high", "explorer", "terra", "high", "read-only", "Read-only repository explorer for interpretive or moderate-risk analysis."),
-    RuntimeProfileSpec("explorer-sol-high.toml", "explorer_sol_high", "explorer", "sol", "high", "read-only", "Read-only specialist for elevated-complexity or elevated-risk analysis."),
-    RuntimeProfileSpec("explorer-sol-xhigh.toml", "explorer_sol_xhigh", "explorer", "sol", "xhigh", "read-only", "Read-only specialist for critical or exceptionally difficult analysis."),
-    RuntimeProfileSpec("search-luna-medium.toml", "search_luna_medium", "search", "luna", "medium", "read-only", "Bounded mechanical read-only search, extraction, indexing, and classification."),
+    RuntimeProfileSpec("worker-terra-medium.toml", "worker_terra_medium", "implementer", "implementer", "terra", "medium", "workspace-write", "AutViam_C implementation worker for routine, low-risk tasks."),
+    RuntimeProfileSpec("worker-terra-high.toml", "worker_terra_high", "implementer", "implementer", "terra", "high", "workspace-write", "AutViam_C implementation worker for moderate-complexity or moderate-risk tasks."),
+    RuntimeProfileSpec("worker-sol-high.toml", "worker_sol_high", "implementer", "implementer", "sol", "high", "workspace-write", "AutViam_C implementation worker for elevated-complexity or elevated-risk tasks."),
+    RuntimeProfileSpec("worker-sol-xhigh.toml", "worker_sol_xhigh", "implementer", "implementer", "sol", "xhigh", "workspace-write", "AutViam_C implementation worker for critical or exceptionally difficult tasks."),
+    RuntimeProfileSpec("orchestrator-terra-medium.toml", "orchestrator_terra_medium", "orchestrator", "orchestrator", "terra", "medium", "workspace-write", "AutViam_C phase orchestrator for routine, low-risk phases."),
+    RuntimeProfileSpec("orchestrator-terra-high.toml", "orchestrator_terra_high", "orchestrator", "orchestrator", "terra", "high", "workspace-write", "AutViam_C phase orchestrator for moderate-complexity or moderate-risk phases."),
+    RuntimeProfileSpec("orchestrator-sol-high.toml", "orchestrator_sol_high", "orchestrator", "orchestrator", "sol", "high", "workspace-write", "AutViam_C phase orchestrator for elevated-complexity or elevated-risk phases."),
+    RuntimeProfileSpec("orchestrator-sol-xhigh.toml", "orchestrator_sol_xhigh", "orchestrator", "orchestrator", "sol", "xhigh", "workspace-write", "AutViam_C phase orchestrator for critical or exceptionally difficult phases."),
+    RuntimeProfileSpec("spec-reviewer-terra-high.toml", "spec_reviewer_terra_high", "spec_reviewer", "spec_reviewer", "terra", "high", "read-only", "AutViam_C read-only Gate A reviewer for routine work."),
+    RuntimeProfileSpec("spec-reviewer-sol-high.toml", "spec_reviewer_sol_high", "spec_reviewer", "spec_reviewer", "sol", "high", "read-only", "AutViam_C read-only Gate A reviewer for moderate and elevated work."),
+    RuntimeProfileSpec("spec-reviewer-sol-xhigh.toml", "spec_reviewer_sol_xhigh", "spec_reviewer", "spec_reviewer", "sol", "xhigh", "read-only", "AutViam_C read-only Gate A reviewer for critical work."),
+    RuntimeProfileSpec("domain-reviewer-terra-high.toml", "domain_reviewer_terra_high", "domain_reviewer", "domain_reviewer", "terra", "high", "read-only", "AutViam_C read-only Gate B reviewer for routine work."),
+    RuntimeProfileSpec("domain-reviewer-sol-high.toml", "domain_reviewer_sol_high", "domain_reviewer", "domain_reviewer", "sol", "high", "read-only", "AutViam_C read-only Gate B reviewer for moderate and elevated work."),
+    RuntimeProfileSpec("domain-reviewer-sol-xhigh.toml", "domain_reviewer_sol_xhigh", "domain_reviewer", "domain_reviewer", "sol", "xhigh", "read-only", "AutViam_C read-only Gate B reviewer for critical work."),
+    RuntimeProfileSpec("explorer-terra-medium.toml", "explorer_terra_medium", "explorer", "explorer", "terra", "medium", "read-only", "Read-only repository explorer for routine evidence gathering."),
+    RuntimeProfileSpec("explorer-terra-high.toml", "explorer_terra_high", "explorer", "explorer", "terra", "high", "read-only", "Read-only repository explorer for interpretive or moderate-risk analysis."),
+    RuntimeProfileSpec("explorer-sol-high.toml", "explorer_sol_high", "explorer", "explorer", "sol", "high", "read-only", "Read-only specialist for elevated-complexity or elevated-risk analysis."),
+    RuntimeProfileSpec("explorer-sol-xhigh.toml", "explorer_sol_xhigh", "explorer", "explorer", "sol", "xhigh", "read-only", "Read-only specialist for critical or exceptionally difficult analysis."),
+    RuntimeProfileSpec("search-luna-medium.toml", "search_luna_medium", "search", "search", "luna", "medium", "read-only", "Bounded mechanical read-only search, extraction, indexing, and classification."),
 )
 
 PINNED_MODELS = {
@@ -170,19 +179,18 @@ def parse_markdown_profile(path: Path) -> MarkdownProfile:
 
     name = metadata.get("name", "").strip()
     description = metadata.get("description", "").strip()
-    agent_type = (metadata.get("codex_agent_type") or metadata.get("agent_type") or "").strip()
     body = "\n".join(lines[closing + 1:]).strip() + "\n"
 
     if not name:
         raise InstallError(f"{path}: frontmatter field 'name' is required.")
     if not description:
         raise InstallError(f"{path}: frontmatter field 'description' is required.")
-    if not agent_type:
-        raise InstallError(f"{path}: 'codex_agent_type' or 'agent_type' is required.")
+    if metadata.get("agent_source", "").lower() != "true":
+        raise InstallError(f"{path}: canonical source must declare agent_source: true.")
     if not body.strip():
         raise InstallError(f"{path}: profile body is empty.")
 
-    return MarkdownProfile(path.resolve(), name, description, agent_type, body, sha256_text(text))
+    return MarkdownProfile(path.resolve(), name, description, body, sha256_text(text))
 
 
 def infer_skill_root(argument: Path | None) -> Path:
@@ -206,12 +214,14 @@ def load_sources(skill_root: Path) -> dict[str, MarkdownProfile]:
         key: parse_markdown_profile(skill_root / "agents" / filename)
         for key, filename in SOURCE_FILES.items()
     }
-    for key, expected in EXPECTED_TYPES.items():
-        actual = sources[key].codex_agent_type
-        if actual != expected:
-            raise InstallError(f"{sources[key].path}: expected codex_agent_type={expected!r}, found {actual!r}.")
-    if sources["spec_reviewer"].name == sources["domain_reviewer"].name:
-        raise InstallError("Spec and domain reviewer source profiles must have distinct names.")
+    expected_names = {key: f"autviam-{key.replace('_', '-')}" for key in SOURCE_FILES}
+    expected_names["orchestrator"] = "autviam-phase-orchestrator"
+    for key, expected_name in expected_names.items():
+        if sources[key].name != expected_name:
+            raise InstallError(
+                f"{sources[key].path}: expected canonical source name={expected_name!r}, "
+                f"found {sources[key].name!r}."
+            )
     return sources
 
 
@@ -227,84 +237,17 @@ def toml_instructions(value: str) -> str:
     return toml_string(normalized)
 
 
-def worker_instructions() -> str:
-    return """You are an AutViam_C implementation worker.
-
-The user message contains the complete task-specific implementation prompt,
-including paths to the task JSON, phase context, relevant plan excerpts,
-verification commands, and retry findings. Read those inputs yourself.
-
-Implement exactly the assigned scope. Do not perform gate review. Do not expand
-scope without a demonstrated dependency. Run the requested tests and report
-concrete files, commands, pass/fail counts, and remaining concerns. Do not
-commit unless the caller explicitly requests it.
-"""
-
-
-def reviewer_instructions(sources: Mapping[str, MarkdownProfile], skill_root: Path) -> str:
-    spec = sources["spec_reviewer"]
-    domain = sources["domain_reviewer"]
-    spec_rel = spec.path.relative_to(skill_root).as_posix()
-    domain_rel = domain.path.relative_to(skill_root).as_posix()
-    return f"""You are an AutViam_C read-only gate-review runtime agent.
-
-The user message must identify exactly one approved bundled prompt profile.
-Read that Markdown profile from the supplied skill_root and follow its body and
-strict output format exactly.
-
-Approved profiles:
-- {spec.name}: <skill_root>/{spec_rel}
-- {domain.name}: <skill_root>/{domain_rel}
-
-Do not combine Gate A and Gate B. Do not substitute one profile for the other.
-Do not edit the workspace. Treat implementer reports as untrusted and inspect
-the requested repository evidence directly.
-
-If the user message does not identify one approved profile, return a concise
-blocked-by-precondition error naming the missing profile selection.
-"""
-
-
-def explorer_instructions() -> str:
-    return """You are a read-only AutViam_C repository specialist.
-
-Gather and interpret evidence for the exact question in the user message.
-Inspect relevant files, symbols, diffs, tests, and documentation. Cite concrete
-paths and locations. Do not modify the workspace, do not implement fixes, and
-do not claim findings unsupported by inspected evidence.
-"""
-
-
-def search_instructions() -> str:
-    return """Perform only bounded, mechanical, objectively checkable read-only work.
-
-Permitted work includes exact search, extraction, indexing, classification,
-inventory generation, and structured summarization. Do not perform gate review,
-architecture judgment, security analysis, debugging, causal analysis, or
-numerical-correctness assessment. Do not modify the workspace.
-"""
-
-
-def instructions_for_role(role: str, sources: Mapping[str, MarkdownProfile], skill_root: Path) -> str:
-    if role == "worker":
-        return worker_instructions()
-    if role == "orchestrator":
-        return sources["orchestrator"].body
-    if role == "reviewer":
-        return reviewer_instructions(sources, skill_root)
-    if role == "explorer":
-        return explorer_instructions()
-    if role == "search":
-        return search_instructions()
-    raise InstallError(f"Unsupported generated role: {role}")
-
-
 def render_profile(spec: RuntimeProfileSpec, models: Mapping[str, str], sources: Mapping[str, MarkdownProfile], skill_root: Path) -> str:
-    instructions = instructions_for_role(spec.role, sources, skill_root)
-    source_hashes = ",".join(f"{key}:{value.sha256[:12]}" for key, value in sorted(sources.items()))
+    try:
+        source = sources[spec.source]
+    except KeyError as exc:
+        raise InstallError(f"Unsupported canonical source: {spec.source}") from exc
+    instructions = source.body
+    source_path = source.path.relative_to(skill_root).as_posix()
     return "\n".join([
         MANAGED_MARKER,
-        f"# generated_at_source_hashes = {source_hashes}",
+        f"# canonical_source = {source_path}",
+        f"# source_sha256 = {source.sha256}",
         "# Do not hand-edit unless you intentionally take ownership of this file.",
         "",
         f"name = {toml_string(spec.name)}",
@@ -337,7 +280,7 @@ def validate_rendered(spec: RuntimeProfileSpec, text: str, models: Mapping[str, 
 
     if not isinstance(parsed.get("developer_instructions"), str) or not parsed["developer_instructions"].strip():
         raise InstallError(f"{spec.filename}: developer_instructions is missing.")
-    if spec.role in {"reviewer", "explorer", "search"} and parsed["sandbox_mode"] != "read-only":
+    if spec.role in {"spec_reviewer", "domain_reviewer", "explorer", "search"} and parsed["sandbox_mode"] != "read-only":
         raise InstallError(f"{spec.filename}: read-only role has a writable sandbox.")
     if spec.role == "search":
         if parsed["model"] != models["luna"] or parsed["model_reasoning_effort"] != "medium":
@@ -403,6 +346,25 @@ def install_profiles(output_dir: Path, generated: Mapping[str, str], args: argpa
     return actions, incomplete
 
 
+def retire_legacy_profiles(output_dir: Path, dry_run: bool) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    for filename in LEGACY_PROFILE_FILENAMES:
+        path = output_dir / filename
+        if not path.exists() or not is_managed(path):
+            continue
+        digest = sha256_text(read_text(path))
+        if not dry_run:
+            path.unlink()
+        actions.append(
+            {
+                "file": str(path),
+                "action": "would-retire" if dry_run else "retire",
+                "sha256": digest,
+            }
+        )
+    return actions
+
+
 def validate_installed(
     output_dir: Path,
     models: Mapping[str, str],
@@ -450,7 +412,7 @@ def make_report(skill_root: Path, repo_root: Path, output_dir: Path, sources: Ma
                 "path": str(profile.path),
                 "name": profile.name,
                 "description": profile.description,
-                "codex_agent_type": profile.codex_agent_type,
+                "agent_source": True,
                 "sha256": profile.sha256,
             }
             for key, profile in sources.items()
@@ -459,6 +421,7 @@ def make_report(skill_root: Path, repo_root: Path, output_dir: Path, sources: Ma
             {
                 "file": spec.filename,
                 "name": spec.name,
+                "source": spec.source,
                 "role": spec.role,
                 "model": models[spec.model_family],
                 "model_reasoning_effort": spec.effort,
@@ -505,13 +468,17 @@ def main(argv: list[str] | None = None) -> int:
             "generator": GENERATOR_ID,
             "output_dir": str(output_dir),
             "complete": True,
-            "profiles": [{"file": s.filename, "name": s.name, "role": s.role, "model": models[s.model_family], "model_reasoning_effort": s.effort, "sandbox_mode": s.sandbox_mode} for s in PROFILE_SPECS],
+            "profiles": [{"file": s.filename, "name": s.name, "source": s.source, "role": s.role, "model": models[s.model_family], "model_reasoning_effort": s.effort, "sandbox_mode": s.sandbox_mode} for s in PROFILE_SPECS],
             "actions": actions,
         }
         emit(report, args.json)
         return 0
 
     actions, incomplete = install_profiles(output_dir, generated, args)
+    if not incomplete:
+        if not args.dry_run:
+            validate_installed(output_dir, models, generated)
+        actions.extend(retire_legacy_profiles(output_dir, args.dry_run))
     report = make_report(skill_root, repo_root, output_dir, sources, models, actions, incomplete)
 
     if not args.dry_run:

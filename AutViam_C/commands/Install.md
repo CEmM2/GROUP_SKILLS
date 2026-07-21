@@ -11,7 +11,7 @@ Run once per repo after initial install. Re-run after adding new repo-local prom
 
 ## Step 0 — Install and validate required runtime profiles
 
-Generate the sixteen managed custom profiles under the consumer repository's `.codex/agents/`:
+Generate the nineteen managed custom profiles under the consumer repository's `.codex/agents/`:
 
 ```bash
 python <skill_root>/scripts/install_agent_profiles.py \
@@ -20,9 +20,11 @@ python <skill_root>/scripts/install_agent_profiles.py \
   --output-dir <repo_root>/.codex/agents
 ```
 
-For `--dry-run`, pass `--dry-run` to the installer. It validates generated TOML in memory and reports intended writes without changing the repo. Do not run the installed-profile validator in dry-run mode unless all sixteen managed profiles already exist.
+For `--dry-run`, pass `--dry-run` to the installer. It validates generated TOML in memory and reports intended writes without changing the repo. Do not run the installed-profile validator in dry-run mode unless all nineteen managed profiles already exist.
 
 The installer updates only files bearing its managed marker. On an unmanaged filename collision it writes `<name>.toml.new`, reports an incomplete installation, and exits nonzero; stop and ask the user to reconcile the collision. Never overwrite an unmanaged profile automatically.
+
+When upgrading from the 16-profile layout, the installer retires only its three managed generic `reviewer-*.toml` files after replacing them with separate Gate A and Gate B families. Same-named unmanaged files are preserved.
 
 After a real install, validate the complete policy and all profiles:
 
@@ -234,7 +236,7 @@ gh api -X PATCH "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)" -
 - **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread; `"on"` uses the routed custom orchestrator profile; `"auto"` performs one routed nesting probe and falls back to `"off"`. Leave it `"off"` unless this Codex runtime lets the custom orchestrator spawn routed subagents. See `commands/E2E.md` § Nested-Dispatch capability.
 - Nested orchestrator mode normally requires `[agents] max_depth = 2` in the active Codex `config.toml`; Codex defaults to depth 1. Do not change this automatically—tell the user when `nested_dispatch` is `on` or `auto` and let the capability probe verify it.
 - **`project`** (default `"disable"`) turns on native GitHub Project sync: set it to a board name (or `{owner,name}` / `{owner,number}`) and AutViam_C adds plan/phase issues to that Project and keeps their Status field in step with the issue lifecycle. `"disable"` (or absent) = no Project calls at all. See `references/project_sync.md`.
-- The generated `.codex/agents/*.toml` files are custom runtime profiles. Bundled Markdown files remain prompt bodies loaded into the routed reviewer/orchestrator profile; they are not the dispatched profile themselves.
+- The six bundled Markdown files are the canonical role-behavior sources. The generated `.codex/agents/*.toml` files embed one source body each and add Codex model, effort, sandbox, and serialization metadata; dispatches use the TOML profile directly and do not reload the Markdown.
 - Every dispatch must run `resolve_codex_agent.py` and use exactly its `agent` result. Built-in `worker`, `explorer`, and `default` profiles and parent model/effort inheritance are prohibited.
 - The config is repo-local. It is never pushed upstream to the AutViam_C skill definition.
 - Trigger matching at runtime uses `git diff --name-only` plus the configured regex patterns — deterministic shell, not LLM judgment.

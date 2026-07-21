@@ -55,7 +55,7 @@ Initialize the gate file and task entry in `gates/phase_<phase>_gates.md`:
 Run A → B → C in sequence. The gates file is the source of truth for the per-gate failure count — after recording each FAIL block, run `gate_state.py cap-check <tasks_folder>/gates/phase_<phase>_gates.md <task_id> <gate>` (→ cap step on `CAP-HIT`) and `gate_state.py sync-counters <tasks_folder>/gates/phase_<phase>_gates.md <task_id>`. Never track failure counts in memory.
 
 ### Gate A — Spec Compliance
-Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-a`, and dispatch the `autviam-spec-reviewer` prompt body through exactly its returned custom profile (see ExecPhase Step 6 for the prompt template). Parse the verdict. If dispatch is unavailable, stop with `blocked-by-precondition`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
+Run the resolver again with `--task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, and dispatch exactly its returned custom profile with task data only (see ExecPhase Step 6). The installed TOML already embeds the canonical Gate A behavior. Parse the verdict. If dispatch is unavailable, stop with `blocked-by-precondition`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
 
 ### Gate B — Domain Quality
 Only after Gate A passes.
@@ -64,7 +64,7 @@ Only after Gate A passes.
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json domain_reviewer.specialists <base_sha> <head_sha>`
 prints the JSON array of matched specialists (or `[]`). Use it as `specialist_agents`; omit from the domain reviewer prompt when empty.
 
-Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-b`, and dispatch the `autviam-domain-reviewer` prompt body through exactly its returned custom profile. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
+Run the resolver again with `--task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`, and dispatch exactly its returned custom profile with task data only. The installed TOML already embeds the canonical Gate B behavior. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
 Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims. On FAIL: record the JSON block (`gate:"C"`, `result:"fail"`), run `cap-check … C` + `sync-counters`. On PASS, the Gate C JSON block records `result:"pass"` + the `commit` SHA (read later by `last-good-sha` for rollback).

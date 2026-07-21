@@ -45,7 +45,14 @@ EXPECTED_TIER_BY_SCORE = {
     for complexity in range(1, 6)
     for risk in range(1, 6)
 }
-ROLES = ("implementer", "orchestrator", "reviewer", "explorer", "mechanical_read_only")
+ROLES = (
+    "implementer",
+    "orchestrator",
+    "spec_reviewer",
+    "domain_reviewer",
+    "explorer",
+    "mechanical_read_only",
+)
 
 
 class ValidationError(RuntimeError):
@@ -215,11 +222,12 @@ def validate_routes(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path
                     uses_luna = result["model"] == "gpt-5.6-luna"
                     if uses_luna != should_use_luna:
                         raise ValidationError("mechanical_read_only Luna boundary is not enforced")
-                if role == "reviewer":
+                if role in {"spec_reviewer", "domain_reviewer"}:
                     tier = EXPECTED_TIER_BY_SCORE[(complexity, risk)]
-                    if tier == "terra_medium" and result["agent"] != "reviewer_terra_high":
+                    prefix = role
+                    if tier == "terra_medium" and result["agent"] != f"{prefix}_terra_high":
                         raise ValidationError("reviewer floor is missing for a routine task")
-                    if tier in {"terra_high", "sol_high"} and result["agent"] != "reviewer_sol_high":
+                    if tier in {"terra_high", "sol_high"} and result["agent"] != f"{prefix}_sol_high":
                         raise ValidationError("reviewer floor is missing for a moderate or elevated task")
                     if result["model"] == "gpt-5.6-luna":
                         raise ValidationError("reviewer route selected Luna")

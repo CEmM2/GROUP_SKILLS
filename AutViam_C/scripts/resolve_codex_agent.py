@@ -22,7 +22,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 
 
 BUILT_IN_AGENTS = {"default", "explorer", "worker"}
-READ_ONLY_ROLES = {"explorer", "mechanical_read_only", "reviewer"}
+READ_ONLY_ROLES = {"domain_reviewer", "explorer", "mechanical_read_only", "spec_reviewer"}
 WRITABLE_ROLES = {"implementer", "orchestrator"}
 REQUIRED_PROFILE_FIELDS = {
     "description",
@@ -41,11 +41,11 @@ EXPECTED_PROFILE_CONFIG = {
 }
 PURPOSE_ROLES = {
     "explore": {"explorer"},
-    "gate-a": {"reviewer"},
-    "gate-b": {"reviewer"},
+    "gate-a": {"spec_reviewer"},
+    "gate-b": {"domain_reviewer"},
     "implementer": {"implementer"},
     "mechanical-read-only": {"mechanical_read_only"},
-    "nesting-probe": {"orchestrator", "reviewer"},
+    "nesting-probe": {"orchestrator", "spec_reviewer"},
     "phase-orchestrator": {"orchestrator"},
     "scaffold": {"implementer"},
     "specialist": {"explorer"},
@@ -116,7 +116,13 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
             raise RoutingError(f"base_tier_by_score[{complexity!r}] must define risks 1 through 5")
 
     profiles = policy.get("profiles_by_role_and_tier")
-    required_roles = {"implementer", "orchestrator", "reviewer", "explorer"}
+    required_roles = {
+        "domain_reviewer",
+        "explorer",
+        "implementer",
+        "orchestrator",
+        "spec_reviewer",
+    }
     if not isinstance(profiles, dict) or set(profiles) != required_roles:
         raise RoutingError(f"profiles_by_role_and_tier must define exactly {sorted(required_roles)}")
     tiers = {value for row in matrix.values() for value in row.values()}

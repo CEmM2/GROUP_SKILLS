@@ -52,11 +52,17 @@
       "sol_high": "orchestrator_sol_high",
       "sol_xhigh": "orchestrator_sol_xhigh"
     },
-    "reviewer": {
-      "terra_medium": "reviewer_terra_high",
-      "terra_high": "reviewer_sol_high",
-      "sol_high": "reviewer_sol_high",
-      "sol_xhigh": "reviewer_sol_xhigh"
+    "spec_reviewer": {
+      "terra_medium": "spec_reviewer_terra_high",
+      "terra_high": "spec_reviewer_sol_high",
+      "sol_high": "spec_reviewer_sol_high",
+      "sol_xhigh": "spec_reviewer_sol_xhigh"
+    },
+    "domain_reviewer": {
+      "terra_medium": "domain_reviewer_terra_high",
+      "terra_high": "domain_reviewer_sol_high",
+      "sol_high": "domain_reviewer_sol_high",
+      "sol_xhigh": "domain_reviewer_sol_xhigh"
     },
     "explorer": {
       "terra_medium": "explorer_terra_medium",

@@ -64,7 +64,7 @@ Codex defaults `agents.max_depth` to 1, so orchestrator mode normally requires `
 
 - **`off`** (default) — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase. Always works, because it never nests.
 - **`on`** — use the routed custom orchestrator per phase (Step 3a, orchestrator branch). Choose this only when you know the Codex runtime lets it spawn nested routed agents.
-- **`auto`** — after decomposition, run one minimal nesting probe against the first runnable phase. Resolve that phase's maximum stored scores with role `orchestrator`, dispatch that custom profile, and have it resolve role `reviewer` from the same scores before spawning the `autviam-spec-reviewer` prompt on an "echo PASS" request. Record both resolver results in the phase evidence file with purpose `nesting-probe`. Success → `on`; failure → fall back to `off`. Do not use built-in profiles for the probe.
+- **`auto`** — after decomposition, run one minimal nesting probe against the first runnable phase. Resolve that phase's maximum stored scores with role `orchestrator`, dispatch that custom profile, and have it resolve role `spec_reviewer` from the same scores before spawning the generated Gate A profile on an "echo PASS" request. Record both resolver results in the phase evidence file with purpose `nesting-probe`. Success → `on`; failure → fall back to `off`. Do not use built-in profiles for the probe.
 
 Set the mode in `autviam_c_config.json` → `nested_dispatch` (default `"off"` if absent). **There is no "halt and fix" path** — a missing nesting capability is a platform limit, not a config bug, so E2E degrades to the inline path instead of dead-ending.
 
@@ -103,7 +103,7 @@ Only when Step 0 recorded **probe pending**:
 - If the run list is empty, skip the probe and use inline mode; there is no phase work to delegate.
 - Otherwise, read the first runnable phase's task JSONs and calculate the maximum stored `complexity` and maximum stored `risk` without changing either score.
 - Invoke the resolver with those aggregate scores and role `orchestrator`, using `<tasks_folder>/Phase_<N>_routing_evidence.json` and purpose `nesting-probe`.
-- Dispatch exactly the returned orchestrator profile. It must resolve role `reviewer` from the same aggregate scores, append that result to the same phase evidence file with purpose `nesting-probe`, and spawn the `autviam-spec-reviewer` prompt on the bounded "echo PASS" request.
+- Dispatch exactly the returned orchestrator profile. It must resolve role `spec_reviewer` from the same aggregate scores, append that result to the same phase evidence file with purpose `nesting-probe`, and spawn the generated Gate A profile on the bounded "echo PASS" request.
 - If both custom-profile dispatches succeed, resolve mode to orchestrator. Otherwise resolve mode to inline and record the failure; never substitute a built-in profile.
 
 ## Step 3 — Phase loop
@@ -120,12 +120,12 @@ For each phase in the run list:
 spawn_agent(
   agent_type="<resolver.agent>",
   message="""
-Use `<skill_root>/agents/autviam-phase-orchestrator.md` as your prompt profile.
-
 <the dispatch-prompt template from § Dispatch Contract, fully filled>
 """
 )
 ```
+
+The installed orchestrator TOML already embeds the canonical `autviam-phase-orchestrator.md` behavior. The dispatch prompt contains phase data only.
 
 ### 3b. Read the phase result
 
