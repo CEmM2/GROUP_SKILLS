@@ -1,0 +1,83 @@
+{
+  "$schema": "./codex-agent-routing.schema.json",
+  "schema_version": 1,
+  "policy_version": "2026-07-21",
+  "base_tier_by_score": {
+    "1": {
+      "1": "terra_medium",
+      "2": "terra_medium",
+      "3": "terra_high",
+      "4": "sol_high",
+      "5": "sol_xhigh"
+    },
+    "2": {
+      "1": "terra_medium",
+      "2": "terra_medium",
+      "3": "terra_high",
+      "4": "sol_high",
+      "5": "sol_xhigh"
+    },
+    "3": {
+      "1": "terra_high",
+      "2": "terra_high",
+      "3": "terra_high",
+      "4": "sol_high",
+      "5": "sol_xhigh"
+    },
+    "4": {
+      "1": "sol_high",
+      "2": "sol_high",
+      "3": "sol_high",
+      "4": "sol_high",
+      "5": "sol_xhigh"
+    },
+    "5": {
+      "1": "sol_xhigh",
+      "2": "sol_xhigh",
+      "3": "sol_xhigh",
+      "4": "sol_xhigh",
+      "5": "sol_xhigh"
+    }
+  },
+  "profiles_by_role_and_tier": {
+    "implementer": {
+      "terra_medium": "worker_terra_medium",
+      "terra_high": "worker_terra_high",
+      "sol_high": "worker_sol_high",
+      "sol_xhigh": "worker_sol_xhigh"
+    },
+    "orchestrator": {
+      "terra_medium": "orchestrator_terra_medium",
+      "terra_high": "orchestrator_terra_high",
+      "sol_high": "orchestrator_sol_high",
+      "sol_xhigh": "orchestrator_sol_xhigh"
+    },
+    "reviewer": {
+      "terra_medium": "reviewer_terra_high",
+      "terra_high": "reviewer_sol_high",
+      "sol_high": "reviewer_sol_high",
+      "sol_xhigh": "reviewer_sol_xhigh"
+    },
+    "explorer": {
+      "terra_medium": "explorer_terra_medium",
+      "terra_high": "explorer_terra_high",
+      "sol_high": "explorer_sol_high",
+      "sol_xhigh": "explorer_sol_xhigh"
+    }
+  },
+  "special_routes": {
+    "mechanical_read_only": {
+      "maximum_complexity": 2,
+      "maximum_risk": 2,
+      "agent": "search_luna_medium",
+      "fallback_role": "explorer"
+    }
+  },
+  "failure_policy": {
+    "invalid_score": "error",
+    "unknown_role": "error",
+    "missing_route": "error",
+    "missing_agent_profile": "error",
+    "unconfigured_model_or_effort": "error"
+  }
+}

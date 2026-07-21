@@ -1,7 +1,6 @@
 # Install
 
-Scans the host repo for agents and skills that AutViam can dispatch during gate reviews or
-implementation, presents a categorisation plan to the user, and writes `autviam_config.json`.
+Generates and validates AutViam's 22 routed Claude profiles, migrates config, installs depth-aware hooks, then scans for optional repo specialist prompts and skills.
 
 Run once per repo after initial install. Re-run after adding new agents/skills or when you
 want to change the integration. Idempotent — re-running overwrites only what you confirm.
@@ -11,12 +10,34 @@ want to change the integration. Idempotent — re-running overwrites only what y
 
 ---
 
+## Step 0 — Generate and validate routing runtime
+
+Run:
+
+```bash
+python3 <skill_root>/scripts/install_claude_agent_profiles.py \
+  --skill-root <skill_root> --repo-root <repo_root> \
+  --output-dir <repo_root>/.claude/agents --install-hook
+python3 <skill_root>/scripts/validate_claude_agent_routing.py \
+  --agents-dir <repo_root>/.claude/agents \
+  --config <skill_root>/autviam_config.json \
+  --additional-agents-dir ~/.claude/agents
+python3 <skill_root>/scripts/check_claude_routing_environment.py \
+  --config <skill_root>/autviam_config.json
+```
+
+For `--dry-run`, pass it to the installer and do not validate absent installed files. Unmanaged collisions produce `.new` files and an incomplete nonzero result; never overwrite them automatically. The validator exact-compares every generated profile to its canonical source rendering, scans duplicate names, and checks all routes and tool allowlists.
+
+The installer accepts legacy `nested_dispatch` strings and writes schema `2-claude-routing`. It creates an ignored local ticket-signing key, installs a blocking Agent `PreToolUse` hook with pinned policy/config/profile/ticket roots plus an audit-only `SubagentStart` hook, and preserves unrelated settings. Retire legacy direct agent files only with the explicit `--retire-legacy` flag after validation; backups move under `.claude/autviam-routing/legacy-agent-backups/`, outside the active agents tree.
+
+After success, restart or explicitly reload Claude Code. Static validation does not prove the live runtime ceiling. For `auto`, use `probe_nested_dispatch.py --prepare`, run the bounded recursive no-write probe described in E2E, and finalize only with its populated evidence file.
+
 ## Step 1 — Scan (bash, deterministic)
 
 ```bash
 # Agents present in this repo, excluding AutViam's own
-ls .claude/agents/*.md 2>/dev/null \
-  | grep -v -E 'autviam-(spec-reviewer|domain-reviewer|phase-orchestrator)\.md$'
+find .claude/agents -name '*.md' -type f 2>/dev/null \
+  | grep -v -E '/autviam-(implementer|spec-reviewer|domain-reviewer|phase-orchestrator|explorer|search)-'
 
 # Skills present (top-level SKILL.md per skill directory), excluding AutViam
 ls .claude/skills/*/SKILL.md 2>/dev/null \
@@ -25,8 +46,7 @@ ls .claude/skills/*/SKILL.md 2>/dev/null \
 
 Read the YAML frontmatter (`name:`, `description:`, `tools:`) of each found file.
 
-If nothing is found, print "No additional agents or skills found — nothing to configure."
-Do not write a config. Exit.
+If nothing optional is found, print "No additional specialist agents or skills found." Keep the normalized routing config and generated profiles from Step 0, skip Steps 2–5, and continue to hook/restart reporting.
 
 ## Step 2 — Check existing config
 
@@ -99,15 +119,26 @@ Write `<skill_root>/autviam_config.json` using the confirmed choices:
 
 ```json
 {
-  "schema_version": "1",
+  "schema_version": "2-claude-routing",
   "installed_at": "<ISO-date>",
   "repo": "<owner/repo or 'local'>",
-  "nested_dispatch": "off",
+  "routing_enforcement": "hook",
+  "allow_environment_overrides": false,
+  "nested_dispatch": {
+    "mode": "off",
+    "max_depth": 4,
+    "runtime_max_depth": null,
+    "phase_orchestrator": {"spawn_implementers": true, "spawn_reviewers": true},
+    "domain_reviewer": {"specialists": "nested"},
+    "on_depth_exhausted": "caller"
+  },
   "project": "disable",
   "domain_reviewer": {
     "specialists": [
       {
         "agent": "<name>",
+        "routing_role": "explorer",
+        "prompt_file": ".claude/agents/<name>.md",
         "description": "<frontmatter description, one line>",
         "trigger_patterns": ["<pattern1>", "<pattern2>"]
       }
@@ -133,7 +164,7 @@ autviam_config.json written.
   implementer skills           : (none)
 
 Re-run '/AutViam install' any time to update.
-ExecPhase/ExecTask pick up the config automatically — no restart needed.
+Restart/reload Claude Code when generated profiles change.
 ```
 
 ## Step 6 — Scripts (no copy needed — single location)
@@ -141,17 +172,18 @@ ExecPhase/ExecTask pick up the config automatically — no restart needed.
 The bundled scripts already live at `<skill_root>/scripts/` (`.claude/skills/AutViam/scripts/`) — distribution placed them there, and that is the **single** copy everything uses:
 - command files call them as `<skill_root>/scripts/<name>`;
 - `project_sync.sh` finds its sibling `update_tracker.sh` in the same dir (`$HERE/update_tracker.sh`);
-- the Step 7 hook points at `<skill_root>/scripts/phase-close.sh`, which resolves its siblings (`issue_body.sh`, `project_sync.sh`, `draft_pr.sh`) from that dir too.
+- routing commands use the installer, resolver, exhaustive validator, environment checker, dispatch hook, depth probe, and audit hook from this directory;
+- the phase-close hook resolves its sibling project/GitHub scripts from this directory.
 
 There is **no second `.claude/scripts/` copy** — one location, nothing to keep in sync. If you use the GitHub Project board and want fixed defaults, drop an optional `tracker.env` (`TRACKER_OWNER`/`TRACKER_NUMBER`) **beside** `update_tracker.sh` at `<skill_root>/scripts/tracker.env`; otherwise `project_sync.sh` resolves the board from `autviam_config.json` → `project`.
 
 The scripts are best-effort / safe: the GitHub & Project scripts no-op unless `gh` is authenticated (and Project sync stays off until `autviam_config.json` → `project` names a board); the rest only run when a command invokes them, and never block a phase on failure.
 
-## Step 7 — Wire the phase-close backstop hook (optional)
+## Step 7 — Verify hooks
 
 `scripts/phase-close.sh` is a **PostToolUse backstop**: when ExecPhase writes a `Handoff_Phase_<N>.md`, it finalizes the just-completed phase (closes the phase issue, sets its Project item to Done) even if the in-band Step 10b close was interrupted. It is idempotent with the in-band path and a silent no-op for every non-handoff write, so it is safe to leave always-on.
 
-Wire it once per repo as a PostToolUse hook on `Edit|Write` in `.claude/settings.json`:
+The installer merges the required blocking `PreToolUse` Agent hook and `SubagentStart` audit hook. Keep the optional phase-close `PostToolUse` hook alongside them in `.claude/settings.json`:
 
 ```json
 {
@@ -182,11 +214,13 @@ gh api -X PATCH "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)" -
 
 ## Notes
 
-- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread (correct for Claude Code, which forbids nested subagent dispatch); `"on"` uses the orchestrator subagent; `"auto"` probes once and falls back to `"off"`. Leave it `"off"` unless you've confirmed this environment allows a subagent to spawn subagents. See `commands/E2E.md` § Step 0.
+- **`nested_dispatch.mode`** controls E2E: `off` is inline, `on` uses the routed orchestrator, and `auto` runs/records a live recursive probe. `max_depth` is the AutViam ceiling and cannot exceed `runtime_max_depth` once detected.
+- **Specialists** use nested Gate B, caller-dispatched explorers with flat Gate B, or off according to config. Depth exhaustion follows `caller|block` exactly.
+- Strict routing blocks environment model/effort overrides; permissive mode records `externally-overridden` evidence.
 - **`project`** (default `"disable"`) turns on native GitHub Project sync: set it to a board name (or `{owner,name}` / `{owner,number}`) and AutViam adds plan/phase issues to that Project and keeps their Status field in step with the issue lifecycle. `"disable"` (or absent) = no Project calls at all. See `references/project_sync.md`.
 - The config is repo-local. It is never pushed upstream to the AutViam skill definition.
 - Trigger matching at runtime uses `git diff --name-only | grep -E '<pattern>'` —
   deterministic bash, not LLM judgment.
-- The domain reviewer receives a `specialist_agents` list in its prompt only when at least
-  one changed file matches a specialist's patterns. Empty list → standard review, no dispatch.
+- In `nested`, Gate B receives matched `specialist_agents`; in `caller`, flat Gate B receives only
+  actual routed `specialist_reports`; in `off`, matching is skipped and neither field is passed.
 - To reset: delete `autviam_config.json` and re-run install, or run with `--dry-run` first.

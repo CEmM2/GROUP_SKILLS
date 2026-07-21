@@ -1,6 +1,6 @@
 # E2E
 
-Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2-Tasks runs in the main thread once, then each phase is delegated to an `autviam-phase-orchestrator` subagent that returns only a phase summary. Main agent context grows by ~1–2k tokens per phase instead of ~30–60k.
+Run a plan end-to-end with config-governed inline or recursively delegated phases. Every orchestrator, implementer, reviewer, and specialist is selected by persistent routing and a depth-aware ticket.
 
 **Inputs:**
 - `<plan_file>` — required
@@ -16,7 +16,7 @@ Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2
 
 ## Dispatch Contract (read before writing any orchestrator dispatch prompt)
 
-The orchestrator agent loads its own job description from `agents/autviam-phase-orchestrator.md` and reads the ScaffoldPhase/ExecPhase command files itself. **The dispatch prompt is data, not instructions.** Its only job is to hand the orchestrator the per-phase pointers it cannot derive on its own.
+The generated orchestrator profile embeds the canonical source from `agents/autviam-phase-orchestrator.md`. **The dispatch prompt is data, not instructions.**
 
 ### What the dispatch prompt MUST contain (and nothing else)
 
@@ -24,6 +24,10 @@ Use this template verbatim. Fill the angle-bracketed placeholders; do not add ot
 
 ```
 skill_root: <absolute path to skills/AutViam/, e.g. /home/user/repo/.claude/skills/AutViam/>
+autviam_routing_ticket: <absolute resolver ticket path>
+current_depth: 1
+maximum_depth: <configured max_depth>
+specialist_topology: nested | caller | off
 phase_id: <integer>
 plan_file: <path to plan markdown>
 tasks_folder: <path, or "default">
@@ -31,7 +35,7 @@ tracking_file: <path, or "default">
 plan_slug: <slug from github_issue_map.json, or derived per SKILL.md>
 working_directory: <repo root>
 parent_branch: <branch name the new phase branch should fork from>
-resume_mode: fresh | take_over | retry_with_instructions | skip_capped | rollback
+resume_mode: fresh | take_over | retry_with_instructions | skip_capped | rollback | caller_specialist_reports
 resume_payload: <only if resume_mode != fresh — see orchestrator spec for shape>
 
 ## Phase-specific context not derivable from the skill or task JSONs
@@ -58,23 +62,23 @@ The following instructions defeat the orchestrator pattern. The orchestrator wil
 
 ### Nested-Dispatch capability (resolved in Step 0)
 
-The orchestrator pattern requires **two** levels of dispatch: the main agent dispatches the orchestrator (level 1), which dispatches implementers + reviewers (level 2). Many environments — including stock Claude Code — forbid level 2 (a subagent cannot spawn subagents). So E2E resolves a `nested_dispatch` mode in Step 0 and **branches**, rather than assuming nesting works:
+The orchestrator pattern uses depth 1 for the phase orchestrator, depth 2 for implementers/reviewers, and optionally depth 3 for Gate B specialists. `autviam_config.json` sets the AutViam ceiling and the live probe records the runtime ceiling:
 
-- **`off`** (default for Claude Code) — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase.
-- **`on`** — use the `autviam-phase-orchestrator` subagent per phase (Step 3a, orchestrator branch).
-- **`auto`** — run one minimal nesting probe: dispatch `autviam-spec-reviewer` with an "echo PASS" prompt from a throwaway orchestrator dispatch. Success → `on`; failure → fall back to `off`.
+- **`off`** — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase.
+- **`on`** — require declared/detected `runtime_max_depth`, validate `max_depth <= runtime_max_depth`, and use the resolved generated orchestrator.
+- **`auto`** — run a bounded, no-write recursive Agent probe up to the safe limit, record the maximum observed depth with `probe_nested_dispatch.py`, then select on when the required topology fits or off otherwise.
 
-Set the mode in `autviam_config.json` → `nested_dispatch`. **There is no "halt and fix" path** — a missing nesting capability is a platform limit, not a config bug, so E2E degrades to the inline path instead of dead-ending.
+At every edge, `resolve_claude_agent.py` checks configured/runtime ceilings and the spawn graph. `on_depth_exhausted=caller` flattens specialist work to the nearest permitted caller and selects flat Gate B; `block` stops with `blocked-by-precondition`.
 
 ---
 
 ## Step 0 — Capability gate
 
-Read `<skill_root>/autviam_config.json` → `nested_dispatch` (default `"off"` if the key or file is absent). Resolve the run mode:
+Run the environment and exhaustive routing validators, then normalize legacy `nested_dispatch: "off"|"on"|"auto"` to the structured object. Resolve `nested_dispatch.mode`:
 
 - `"off"` → **inline mode**. No orchestrator, no probe.
 - `"on"` → **orchestrator mode**.
-- `"auto"` → run the one-shot nesting probe (§ Nested-Dispatch capability); success → orchestrator mode, failure → inline mode.
+- `"auto"` → first run `probe_nested_dispatch.py --config <config> --safe-limit <N> --evidence-file <operational-path> --session-id <live-session-id> --prepare`. Use temporary `routing-probe-depth-N` PASS-only profiles (never implementation or production reviewer prompts) whose only allowed child is the next probe depth. Append each actual Agent result (`agent_id`, `agent_type`, `parent_agent_id`, depth, status) to the evidence file, stop on the first failed child spawn or safe limit, then finalize with `--observed-depth <N> --evidence-file <operational-path> --audit-log <project>/.claude/autviam-routing/subagent-start.jsonl --record`. Remove the temporary probe profiles. The script requires an exact same-session SubagentStart audit match and parent chain for every passing depth and rejects missing, non-contiguous, write-producing, or mismatched evidence. Select orchestrator only if the required phase topology fits.
 
 Record the resolved mode — Step 3 branches on it. This runs **before** Plan-2-Tasks so no decomposition work is wasted discovering that nesting is unavailable.
 
@@ -100,23 +104,23 @@ For each phase in the run list:
 
 ### 3a. Run the phase (branch on the Step 0 mode)
 
-**Inline mode (`off`, default in Claude Code):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. The implementer and Gate A/B reviewers dispatch as single-level subagents. There is no dispatch prompt and no orchestrator; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
+**Inline mode (`off`):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. The implementer and Gate A/B reviewers dispatch as single-level subagents. There is no dispatch prompt and no orchestrator; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
 
-**Orchestrator mode (`on`):** dispatch the phase to a subagent:
+**Orchestrator mode (`on`):** invoke `resolve_claude_agent.py` with `--phase-id <N>`, role/purpose `orchestrator`/`phase-orchestrator`, depth 1, and `<tasks_folder>/Phase_<N>_routing_evidence.json`. The resolver and hook independently scan `<tasks_folder>/json/P<N>-*.json` and compute the maximum immutable complexity/risk aggregates; do not pass caller-authored phase scores. Dispatch exactly the returned generated profile and ticket:
 
 ```
 Agent(
-  subagent_type="autviam-phase-orchestrator",
+  subagent_type="<resolver.agent>",
   description="AutViam phase <N> orchestrator",
-  prompt="<the dispatch-prompt template from § Dispatch Contract, fully filled>"
+  prompt="autviam_routing_ticket: <resolver.ticket_path>\n<the dispatch template, fully filled>"
 )
 ```
 
-Fall back to dispatching the Task tool with the orchestrator's system prompt inlined if the named subagent isn't installed.
+Never pass `model` in the Agent call. Missing profile, hook rejection, or dispatch failure is fatal; there is no legacy or inline fallback while resolved mode is `on`.
 
 ### 3b. Read the phase result
 
-**Orchestrator mode:** the orchestrator's last fenced JSON block is the structured result. Extract `status`, `tasks_done`, `capped_tasks`, `handoff_path`, `summary_line`. Show the user the `summary_line` and the 3–5 prose lines preceding the JSON — that's all the per-phase detail the main context absorbs.
+**Orchestrator mode:** the orchestrator's last fenced JSON block is the structured result. Extract `status`, `tasks_done`, `capped_tasks`, `handoff_path`, `summary_line`, and `caller_specialist_request`. Show the user the `summary_line` and the 3–5 prose lines preceding the JSON — that's all the per-phase detail the main context absorbs.
 
 **Inline mode:** ExecPhase ran in the main thread, so its status (`completed` / `gate-cap-hit` / `blocked-by-precondition` / `failed`), the tasks done/capped, and the handoff path are already available directly — no JSON parsing. Summarize them for the user the same way.
 
@@ -125,6 +129,7 @@ Fall back to dispatching the Task tool with the orchestrator's system prompt inl
 | Status | Action |
 |---|---|
 | `completed` | Increment `phases_run_this_invocation`. If `--stop-after <count>` and `phases_run_this_invocation == count`: stop loop, go to Step 4. If this phase was the truncation target from `--stop-after pN`: stop loop, go to Step 4. If this is the last phase in the run list: stop loop, go to Step 4. Otherwise: continue to the next phase. |
+| `caller-specialists-required` | In the main session, resolve each requested lens as role `explorer`, purpose `specialist`, at top-level depth 1 from the named task's immutable routing. Dispatch with tickets and write the reports atomically under `<tasks_folder>/reviews/`. Preserve the request's complete `resume_packet`. Resolve a **fresh** phase-orchestrator ticket from `--phase-id <N>` and the canonical phase task JSONs, then redispatch with `resume_mode="caller_specialist_reports"` and `resume_payload={"task_id":"...","reports_path":"...","resume_packet":<unchanged request.resume_packet>}`. A failed resolver/dispatch is fatal; never substitute inline review. Re-loop on the same phase without incrementing the completed count. |
 | `gate-cap-hit` | Surface the cap report (§ Gate-Cap Bounce-Back). Await user choice. Re-dispatch the orchestrator with the chosen `resume_mode` and re-loop on the same phase. The retry **does not** count toward `--stop-after <N>` — only fully-completed phases count. |
 | `blocked-by-precondition` | Stop. Surface to user — quote any `offending_instruction` if present. The precondition must be fixed before re-trying. |
 | `failed` | Stop. Surface the `error` field. |

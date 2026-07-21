@@ -1,6 +1,6 @@
 # Install
 
-Scans the host repo for Codex prompt profiles and skills that AutViam_C can dispatch during gate reviews or implementation, presents a categorisation plan to the user, and writes `autviam_c_config.json`.
+Installs and validates AutViam_C's explicit Path-2 runtime profiles, then scans the host repo for optional prompt lenses and skills, presents a categorisation plan, and writes `autviam_c_config.json`.
 
 Run once per repo after initial install. Re-run after adding new repo-local prompt profiles or skills, or when you want to change the integration. Idempotent — re-running overwrites only what you confirm.
 
@@ -8,6 +8,39 @@ Run once per repo after initial install. Re-run after adding new repo-local prom
 - `[--dry-run]` — show the proposed plan without writing anything
 
 ---
+
+## Step 0 — Install and validate required runtime profiles
+
+Generate the sixteen managed custom profiles under the consumer repository's `.codex/agents/`:
+
+```bash
+python <skill_root>/scripts/install_agent_profiles.py \
+  --skill-root <skill_root> \
+  --repo-root <repo_root> \
+  --output-dir <repo_root>/.codex/agents
+```
+
+For `--dry-run`, pass `--dry-run` to the installer. It validates generated TOML in memory and reports intended writes without changing the repo. Do not run the installed-profile validator in dry-run mode unless all sixteen managed profiles already exist.
+
+The installer updates only files bearing its managed marker. On an unmanaged filename collision it writes `<name>.toml.new`, reports an incomplete installation, and exits nonzero; stop and ask the user to reconcile the collision. Never overwrite an unmanaged profile automatically.
+
+After a real install, validate the complete policy and all profiles:
+
+```bash
+python <skill_root>/scripts/validate_codex_agent_routing.py \
+  --policy <skill_root>/references/codex-agent-routing.json \
+  --agents-dir <repo_root>/.codex/agents
+```
+
+Any nonzero result is fatal. Do not continue to configuration or dispatch. This validator proves policy, source rendering, and installed TOML consistency; it cannot prove that the active Codex account/runtime can dispatch every pinned model.
+
+When installation succeeds, tell the user to start a new Codex session so the custom profiles are discoverable. In that new session, perform a bounded live smoke check before the first real AutViam_C run:
+
+1. Resolve and dispatch one `mechanical_read_only` task scored 1/1 through `search_luna_medium`; require the returned subagent to answer only `PASS`.
+2. Resolve and dispatch representative Terra and Sol read-only routes the same way.
+3. Confirm each live subagent reports the exact profile/model selected by the resolver.
+
+If any custom profile or pinned model (especially Luna) is unavailable, Path 2 is blocked in that runtime. Do not substitute a built-in profile or a different model, and do not claim runtime verification from the static validator alone.
 
 ## Step 1 — Scan (deterministic)
 
@@ -154,6 +187,8 @@ ExecPhase/ExecTask pick up the config automatically — no restart needed.
 
 The bundled scripts already live at `<skill_root>/scripts/` (`.codex/skills/AutViam_C/scripts/`) — distribution placed them there, and that is the **single** copy everything uses:
 - command files call them as `<skill_root>/scripts/<name>`;
+- `install_agent_profiles.py`, `resolve_codex_agent.py`, and `validate_codex_agent_routing.py` own Path-2 profile installation, resolution, evidence, and exhaustive validation;
+- `expand_codex_agents.py` is a deprecated compatibility entry point that exits nonzero and directs callers to `install_agent_profiles.py`; template-derived profiles cannot satisfy Path 2's exact managed-source validation;
 - `project_sync.sh` finds its sibling `update_tracker.sh` in the same dir (`$HERE/update_tracker.sh`);
 - the Step 7 hook points at `<skill_root>/scripts/phase-close.sh`, which resolves its siblings (`issue_body.sh`, `project_sync.sh`, `draft_pr.sh`) from that dir too.
 
@@ -196,9 +231,11 @@ gh api -X PATCH "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)" -
 
 ## Runtime Notes
 
-- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread (always works, since a Codex `worker` never has to spawn nested agents); `"on"` uses the orchestrator worker; `"auto"` probes once and falls back to `"off"`. Leave it `"off"` unless you've confirmed this Codex runtime lets a `worker` spawn nested agents. See `commands/E2E.md` § Nested-Dispatch capability.
+- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread; `"on"` uses the routed custom orchestrator profile; `"auto"` performs one routed nesting probe and falls back to `"off"`. Leave it `"off"` unless this Codex runtime lets the custom orchestrator spawn routed subagents. See `commands/E2E.md` § Nested-Dispatch capability.
+- Nested orchestrator mode normally requires `[agents] max_depth = 2` in the active Codex `config.toml`; Codex defaults to depth 1. Do not change this automatically—tell the user when `nested_dispatch` is `on` or `auto` and let the capability probe verify it.
 - **`project`** (default `"disable"`) turns on native GitHub Project sync: set it to a board name (or `{owner,name}` / `{owner,number}`) and AutViam_C adds plan/phase issues to that Project and keeps their Status field in step with the issue lifecycle. `"disable"` (or absent) = no Project calls at all. See `references/project_sync.md`.
-- Codex does not install custom named agents globally. Prompt profiles remain markdown files and are loaded into built-in `explorer` or `worker` agents at dispatch time.
+- The generated `.codex/agents/*.toml` files are custom runtime profiles. Bundled Markdown files remain prompt bodies loaded into the routed reviewer/orchestrator profile; they are not the dispatched profile themselves.
+- Every dispatch must run `resolve_codex_agent.py` and use exactly its `agent` result. Built-in `worker`, `explorer`, and `default` profiles and parent model/effort inheritance are prohibited.
 - The config is repo-local. It is never pushed upstream to the AutViam_C skill definition.
 - Trigger matching at runtime uses `git diff --name-only` plus the configured regex patterns — deterministic shell, not LLM judgment.
 - The domain reviewer receives a `specialist_agents` list only when at least one changed file matches a specialist's patterns. Empty list → standard review, no specialist dispatch.

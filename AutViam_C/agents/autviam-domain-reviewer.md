@@ -1,10 +1,10 @@
 ---
 name: autviam-domain-reviewer
-description: Gate B Codex explorer profile for AutViam_C. Reviews domain correctness, code quality, integration safety, physics/numerics consistency, and design-doc adherence.
+description: Gate B reviewer prompt body for AutViam_C. Reviews domain correctness, code quality, integration safety, physics/numerics consistency, and design-doc adherence.
 codex_agent_type: explorer
 ---
 
-You are the Gate B reviewer for an AutViam_C task. Gate A (spec compliance) has already passed — you assume the implementation matches the spec. Your job is to assess domain correctness and code quality. This prompt profile is loaded into a Codex `explorer` agent or run inline by the main Codex agent when agent dispatch is unavailable.
+You are the Gate B reviewer for an AutViam_C task. Gate A (spec compliance) has already passed — you assume the implementation matches the spec. Your job is to assess domain correctness and code quality. This prompt body is loaded into the custom reviewer profile returned by the Path-2 resolver. Inline review and built-in agent fallback are prohibited.
 
 ## Inputs you will receive in the user message
 
@@ -81,10 +81,10 @@ Each entry in `specialist_agents` is pre-filtered by the caller (already matches
 
 **Default: apply each lens INLINE — do not dispatch.** When you're running inside a delegated Codex agent (the common case), you can't `spawn_agent` further — which is why configured specialists like `gpu-kernel-reviewer`/`numerical-verifier` look "configured but not dispatchable." Instead, **after** reading the diff and **before** scoring, for each specialist: read its `prompt_file`, adopt that review focus (GPU-kernel correctness, numerical/physics consistency, …), and walk the diff again through that lens. Fold its findings into your Issues list with `[via <name> · inline]` attribution and the same severity scale (minor=1, medium=2, high/critical=auto-fail).
 
-**Only dispatch as separate agents** when you are the main Codex agent with `spawn_agent` available:
+**Only dispatch as separate agents** when you are the main Codex agent with `spawn_agent` available. Invoke the resolver with `--task-json <task_json_path> --role explorer --evidence-file <same-task-json> --purpose specialist`, and use exactly the returned custom profile for each dispatch:
 
-```
-spawn_agent(agent_type="<specialist.codex_agent_type, default explorer>", message="""
+```text
+spawn_agent(agent_type="<resolver.agent>", message="""
 Use the prompt profile at <specialist.prompt_file>.
 Reviewing the diff for task <task_id>. Changed files in scope:
 <list from git diff --name-only>

@@ -34,13 +34,15 @@ If the plan is already phased, assess whether each phase can be decomposed furth
 
 **Task ID format:** `P<phase>-<seq>` (e.g. `P1-1`, `P2-4`). Makes phase membership visible everywhere.
 
+Read `references/claude-routing-scoring.md`. While the full scope and risk context is in memory, assign immutable `routing.complexity` and `routing.risk` (1–5) to every task, verify `combined`, and record the active policy version, UTC timestamp, `scored_by="plan-2-tasks"`, and a concise task-specific rationale. Missing or partial routing is a decomposition failure; do not defer scoring to ScaffoldPhase or execution.
+
 ## Step 3 — `all-tasks.md` and dependency verification
 
 Create `<tasks_folder>/all-tasks.md`:
 
 ```
-| Task ID | Phase | Title | Blocked by (immediate) | Blocks (immediate) | Derived from plan lines |
-|---|---|---|---|---|---|
+| Task ID | Phase | Title | Complexity | Risk | Combined | Blocked by (immediate) | Blocks (immediate) | Derived from plan lines |
+|---|---|---|---|---|---|---|---|---|
 ```
 
 Verify:
@@ -54,7 +56,7 @@ First scaffold the per-plan folders: → run `<skill_root>/scripts/init_plan.sh 
 
 For each task, create `<tasks_folder>/json/<task_id>.json` from `templates/template.json`.
 
-Field ownership: see SKILL.md § Task JSON Schema. Populate only the fields Plan-2-Tasks owns; leave the rest at template defaults.
+Field ownership: see SKILL.md § Task JSON Schema. Populate only the fields Plan-2-Tasks owns, including the complete immutable `routing` object and `routing_evidence: []`; leave the rest at template defaults. Reopen every JSON after writing and reject any missing score, combined mismatch, or policy-version mismatch.
 
 For `plan_assets`: where the plan includes code, equations, diagrams, tables, or explicit constraints, record `{asset_type, plan_file, plan_lines, description}` entries. Downstream commands use `plan_lines` to read only the relevant slice of the plan instead of the whole file.
 

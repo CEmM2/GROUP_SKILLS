@@ -19,6 +19,9 @@
     },
     "test_artifacts": [],
     "risks": [],
+    "complexity": null,
+    "risk": null,
+    "routing_evidence": [],
     "status": "",
     "completion_date": "",
     "test_completion": {

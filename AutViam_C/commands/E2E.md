@@ -1,6 +1,6 @@
 # E2E
 
-Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2-Tasks runs in the main thread once, then each phase either runs **inline** (the `phase` path, in main) or is delegated to a Codex `worker` loaded with the `autviam-phase-orchestrator` prompt profile, depending on the resolved nested-dispatch mode. In orchestrator mode the worker returns only a phase summary, so main-agent context grows by ~1–2k tokens per phase instead of ~30–60k.
+Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2-Tasks runs in the main thread once, then each phase either runs **inline** (the `phase` path, in main) or is delegated to the custom orchestrator profile returned by the Path-2 resolver and loaded with the `autviam-phase-orchestrator` prompt body, depending on the resolved nested-dispatch mode. In orchestrator mode the agent returns only a phase summary, so main-agent context grows by ~1–2k tokens per phase instead of ~30–60k.
 
 **Inputs:**
 - `<plan_file>` — required
@@ -16,13 +16,13 @@ Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2
 
 ## Dispatch Contract (read before writing any orchestrator dispatch prompt)
 
-The orchestrator worker loads its job description from `agents/autviam-phase-orchestrator.md` and reads the ScaffoldPhase/ExecPhase command files itself. **The dispatch prompt is data, not instructions.** Its only job is to hand the orchestrator the per-phase pointers it cannot derive on its own. (This section applies only in orchestrator mode — see § Nested-Dispatch capability.)
+The routed orchestrator loads its job description from `agents/autviam-phase-orchestrator.md` and reads the ScaffoldPhase/ExecPhase command files itself. **The dispatch prompt is data, not instructions.** Its only job is to hand the orchestrator the per-phase pointers it cannot derive on its own. (This section applies only in orchestrator mode — see § Nested-Dispatch capability.)
 
 ### What the dispatch prompt MUST contain (and nothing else)
 
 Use this template verbatim. Fill the angle-bracketed placeholders; do not add other sections, do not paraphrase the boilerplate.
 
-```
+```text
 skill_root: <absolute path to skills/AutViam_C/, e.g. /home/user/repo/.codex/skills/AutViam_C/>
 phase_id: <integer>
 plan_file: <path to plan markdown>
@@ -51,18 +51,20 @@ resume_payload: <only if resume_mode != fresh — see orchestrator spec for shap
 The following instructions defeat the orchestrator pattern. The orchestrator will halt with `status: "blocked-by-precondition"` if it sees them:
 
 - "Do all implementation inline yourself" / "do not dispatch implementers" / "do gate reviews yourself"
-- "No spawn_agent" / "no delegated agents" — environment constraints on Codex worker/explorer dispatch must be resolved before E2E runs (Step 0), not papered over in the dispatch prompt. See § Nested-Dispatch capability.
+- "No spawn_agent" / "no delegated agents" — environment constraints on custom-profile dispatch must be resolved before E2E runs (Step 0), not papered over in the dispatch prompt. See § Nested-Dispatch capability.
 - Re-stating any of the orchestrator's internal rules (gate cap = 3, plan-reading discipline, JSON-by-path, halt triggers). The orchestrator already knows these. Re-stating risks drift if the rules change and is pure cost.
 - Restating ScaffoldPhase or ExecPhase steps. The orchestrator reads them itself.
 - Critical-risk notes that are already in `Phase_<N>_context_summary.md` or task JSONs. The orchestrator reads those.
 
-### Nested-Dispatch capability (resolved in Step 0)
+### Nested-Dispatch capability (resolved after decomposition)
 
-The orchestrator pattern requires **two** levels of dispatch: the main agent spawns the orchestrator worker (level 1), which spawns implementers + reviewers (level 2). Some environments forbid level 2 (a Codex `worker` cannot itself `spawn_agent`). Whether a given Codex runtime allows nesting is environment-dependent, so E2E resolves a `nested_dispatch` mode in Step 0 and **branches**, rather than assuming nesting works:
+The orchestrator pattern requires **two** levels of dispatch: the main agent spawns the routed orchestrator profile (level 1), which spawns routed implementers + reviewers (level 2). Some environments forbid level 2. Whether a given Codex runtime allows nesting is environment-dependent, so E2E reads the configured `nested_dispatch` mode in Step 0, resolves `auto` after decomposition, and **branches**, rather than assuming nesting works:
+
+Codex defaults `agents.max_depth` to 1, so orchestrator mode normally requires `[agents] max_depth = 2` in the active `config.toml`. The probe remains authoritative because managed policy or the active client may still constrain nesting.
 
 - **`off`** (default) — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase. Always works, because it never nests.
-- **`on`** — use the `autviam-phase-orchestrator` worker per phase (Step 3a, orchestrator branch). Choose this only when you know the Codex runtime lets a `worker` spawn nested agents.
-- **`auto`** — run one minimal nesting probe: from a throwaway orchestrator-worker dispatch, have it `spawn_agent` an `explorer` with the `autviam-spec-reviewer` profile on an "echo PASS" prompt. Success → `on`; failure → fall back to `off`.
+- **`on`** — use the routed custom orchestrator per phase (Step 3a, orchestrator branch). Choose this only when you know the Codex runtime lets it spawn nested routed agents.
+- **`auto`** — after decomposition, run one minimal nesting probe against the first runnable phase. Resolve that phase's maximum stored scores with role `orchestrator`, dispatch that custom profile, and have it resolve role `reviewer` from the same scores before spawning the `autviam-spec-reviewer` prompt on an "echo PASS" request. Record both resolver results in the phase evidence file with purpose `nesting-probe`. Success → `on`; failure → fall back to `off`. Do not use built-in profiles for the probe.
 
 Set the mode in `autviam_c_config.json` → `nested_dispatch` (default `"off"` if absent). **There is no "halt and fix" path** — a missing nesting capability is a platform limit, not a config bug, so E2E degrades to the inline path instead of dead-ending.
 
@@ -74,9 +76,9 @@ Read `<skill_root>/autviam_c_config.json` → `nested_dispatch` (default `"off"`
 
 - `"off"` → **inline mode**. No orchestrator, no probe.
 - `"on"` → **orchestrator mode**.
-- `"auto"` → run the one-shot nesting probe (§ Nested-Dispatch capability); success → orchestrator mode, failure → inline mode.
+- `"auto"` → set mode to **probe pending**. Do not probe yet: task scores do not exist until Plan-2-Tasks and the runnable phase list is known.
 
-Record the resolved mode — Step 3 branches on it. This runs **before** Plan-2-Tasks so no decomposition work is wasted discovering that nesting is unavailable.
+Record the configured mode or pending state. Step 2b resolves the pending probe before Step 3 branches.
 
 ## Step 1 — Plan-2-Tasks (once, in main)
 
@@ -94,19 +96,29 @@ If `--stop-after pN`:
 
 If `--stop-after <N>` (count): keep the full run list — the count is applied dynamically in Step 3.
 
+## Step 2b — Resolve pending auto mode
+
+Only when Step 0 recorded **probe pending**:
+
+- If the run list is empty, skip the probe and use inline mode; there is no phase work to delegate.
+- Otherwise, read the first runnable phase's task JSONs and calculate the maximum stored `complexity` and maximum stored `risk` without changing either score.
+- Invoke the resolver with those aggregate scores and role `orchestrator`, using `<tasks_folder>/Phase_<N>_routing_evidence.json` and purpose `nesting-probe`.
+- Dispatch exactly the returned orchestrator profile. It must resolve role `reviewer` from the same aggregate scores, append that result to the same phase evidence file with purpose `nesting-probe`, and spawn the `autviam-spec-reviewer` prompt on the bounded "echo PASS" request.
+- If both custom-profile dispatches succeed, resolve mode to orchestrator. Otherwise resolve mode to inline and record the failure; never substitute a built-in profile.
+
 ## Step 3 — Phase loop
 
 For each phase in the run list:
 
-### 3a. Run the phase (branch on the Step 0 mode)
+### 3a. Run the phase (branch on the resolved mode)
 
 **Inline mode (`off`, default):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. The implementer and Gate A/B reviewer profiles dispatch as single-level `spawn_agent` calls. There is no dispatch prompt and no orchestrator; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
 
-**Orchestrator mode (`on`):** dispatch the phase to a worker:
+**Orchestrator mode (`on`):** take the maximum stored `complexity` and maximum stored `risk` across the phase's tasks, invoke the resolver with role `orchestrator`, and write the complete result to `<tasks_folder>/Phase_<N>_routing_evidence.json` with purpose `phase-orchestrator` and a UTC timestamp. Then dispatch the phase through exactly the returned custom profile:
 
-```
+```text
 spawn_agent(
-  agent_type="worker",
+  agent_type="<resolver.agent>",
   message="""
 Use `<skill_root>/agents/autviam-phase-orchestrator.md` as your prompt profile.
 
@@ -214,6 +226,6 @@ In **inline mode** there is no orchestrator to re-dispatch; ExecPhase's Step 7 h
 
 ## Budget notes
 
-- **Main agent context per phase:** ~1–2k tokens in orchestrator mode (worker prose summary + JSON return + occasional gate-cap bounce-back); more in inline mode, where ExecPhase runs in main.
-- **Orchestrator worker context per phase:** bounded by phase size; thrown away when the worker returns (orchestrator mode only).
+- **Main agent context per phase:** ~1–2k tokens in orchestrator mode (orchestrator prose summary + JSON return + occasional gate-cap bounce-back); more in inline mode, where ExecPhase runs in main.
+- **Routed orchestrator context per phase:** bounded by phase size; thrown away when the orchestrator returns (orchestrator mode only).
 - **`gh` calls per phase:** same as ExecPhase Step 10 (~4 calls). E2E adds no GitHub overhead of its own.

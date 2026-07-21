@@ -2,7 +2,7 @@
 
 Scaffold then execute one phase, **inline in the main thread** — AutViam's non-nested execution path.
 
-ScaffoldPhase and ExecPhase dispatch their subagents (the implementer via Task, the Gate A/B reviewers via Agent) one level down from whoever runs them. Run them inline in **main** and those are **single-level** dispatches — which work everywhere, including stock Claude Code where the E2E orchestrator's *second* level of dispatch cannot.
+ScaffoldPhase and ExecPhase resolve every generated agent and depth-aware ticket one level down from the main session. A nested Gate B may resolve explorer specialists at depth 2; caller mode keeps Gate B flat and has the main caller dispatch routed explorers.
 
 Use `phase` for "do this one phase now." For a lean full run when nested dispatch is available, use `e2e`; when it isn't, `e2e` degrades to a loop over this command (see `E2E.md` § Step 0 — Capability gate).
 
@@ -15,6 +15,7 @@ Use `phase` for "do this one phase now." For a lean full run when nested dispatc
 - `gh auth status` (per SKILL.md § Idempotency — all GitHub steps skip cleanly if it fails; the local pipeline stays the source of truth).
 - Confirm `<tasks_folder>/all-tasks.md` exists. If not, run `commands/Plan-2-Tasks.md` first (or tell the user to run `tasks`).
 - Confirm `<phase_id>` is a real phase in `all-tasks.md` and that its cross-phase blockers (tasks in earlier phases) are `status="done"`.
+- Run `check_claude_routing_environment.py` and `validate_claude_agent_routing.py`; validate topology at parent depth 0 before ScaffoldPhase. ScaffoldPhase/ExecPhase must use `resolve_claude_agent.py` for every child dispatch.
 
 ## Step 1 — Scaffold
 
@@ -22,7 +23,7 @@ If `<tasks_folder>/Phase_<phase_id>_Scaffold_Validation.md` is **absent**, run `
 
 ## Step 2 — Execute
 
-Run `commands/ExecPhase.md` for `<phase_id>` in the **same (main) thread**. Everything ExecPhase defines holds unchanged: the model-assignment rule, the 3-failure-per-gate cap, Gate C verification, and Step 10 (handoff file + batched phase-issue/plan-overview GitHub updates, plus project sync if the board is armed). The implementer and the two reviewer agents dispatch as single-level subagents.
+Run `commands/ExecPhase.md` for `<phase_id>` in the **same main thread**. Everything ExecPhase defines holds unchanged: immutable routing, resolver/ticket enforcement, the 3-failure cap, Gate C, and Step 10 handoff/GitHub updates.
 
 ## Step 3 — Report
 

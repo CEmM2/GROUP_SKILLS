@@ -1,17 +1,14 @@
 ---
 name: AutViam_C
 description: >
-  Codex-native token-lean plan-to-execution pipeline. Decomposes plans into
-  phased tasks, scaffolds tests, executes through quality gates with a hard
-  3-failure cap, uses Codex worker/explorer agents via bundled prompt profiles,
-  and mirrors progress to GitHub at the phase level only. Use when the user
-  invokes AutViam_C or asks for Plan-2-Tasks, ScaffoldPhase, ExecPhase, ExecTask,
-  or E2E plan execution in Codex.
+  Codex-native phased plan execution with test scaffolding, quality gates,
+  deterministic custom-agent routing, a hard failure cap, and phase-level
+  GitHub tracking. Use for AutViam_C or its phase commands.
 ---
 
 # AutViam_C — Codex Plan → Scaffold → Execute
 
-Self-contained pipeline turning a markdown plan into tracked, executed, verified work. This is the Codex-native fork of AutViam: it preserves the phase-only GitHub issue model and gate discipline, but replaces Claude Code installed agents with bundled Codex prompt profiles dispatched through Codex `worker` and `explorer` agents.
+Self-contained pipeline turning a markdown plan into tracked, executed, verified work. This is the Codex-native fork of AutViam: it preserves the phase-only GitHub issue model and gate discipline while routing every subagent through an explicit, installed Codex profile. Bundled Markdown prompt profiles supply role instructions; the routed TOML profile pins the model, reasoning effort, and sandbox.
 
 ## Routing
 
@@ -68,16 +65,24 @@ The pipeline isolates each plan on its own branch + git worktree so phases merge
 Never paste full task JSON content into a Codex agent prompt. Always pass the file path and the field list it needs. The receiving agent reads the file itself. This eliminates re-paying multi-KB JSON on every gate retry.
 
 ### Codex Agent Assignment (single source of truth)
-Computed once per task from `complexity + risk` (each 1–5):
-- Implementers and phase orchestrators use Codex `worker` agents.
-- Gate reviewers and read-only specialists use Codex `explorer` agents.
-- `combined > 6` → `reasoning_effort="xhigh"` for implementer and reviewer dispatches.
-- `complexity >= 3 OR risk >= 3` → `reasoning_effort="high"`.
-- Low-risk read-only/search subtasks may use `reasoning_effort="low"` or `"medium"`.
 
-Do not invent custom Codex `agent_type` names. The bundled files under `agents/` are prompt profiles loaded into the prompt for built-in Codex agent types. Omit model overrides unless the user explicitly asks for a particular model or a task clearly requires one.
+Use `references/codex-agent-routing.json` as the canonical routing policy. Compute `complexity` and `risk` once per task during Plan-2-Tasks, store both values in the task JSON, and never recompute them in a phase or subagent. Score with `references/codex-routing-scoring.md`.
 
-Both ExecPhase and ExecTask reference this rule by name; do not re-state it inline.
+Before every Codex subagent dispatch:
+
+1. For a task dispatch, identify its task JSON path; the resolver must read `task_id`, `complexity`, and `risk` directly from that file. For a phase orchestrator, use the maximum stored complexity and maximum stored risk across that phase's tasks.
+2. Select one role: `implementer`, `orchestrator`, `reviewer`, `explorer`, or `mechanical_read_only`.
+3. For every task dispatch, invoke `<skill_root>/scripts/resolve_codex_agent.py --task-json <task-json> --role <role> --evidence-file <same-task-json> --purpose <purpose>`. Raw `--complexity/--risk` inputs are reserved for phase aggregation and diagnostics; they cannot write evidence into a task JSON.
+4. Parse the JSON output and dispatch exactly the custom profile in `agent`.
+5. Confirm the resolver atomically appended its complete output, dispatch purpose, and timestamp to the task JSON or phase routing-evidence file.
+6. Do not dispatch built-in `worker`, `explorer`, or `default` profiles. Do not substitute another model, reasoning effort, or profile. Do not inherit either setting from the parent session.
+7. Treat any resolver, profile-validation, or dispatch-availability failure as fatal. Never fall back silently.
+
+The routing JSON selects a profile. The installed `.codex/agents/*.toml` profile is the sole source of truth for model, reasoning effort, sandbox, tools, and role instructions. The bounded `mechanical_read_only` route uses Luna only for `complexity <= 2` and `risk <= 2`; larger mechanical read-only tasks route through the normal explorer tier. Reviewers never use Luna and apply the reviewer floor defined by the policy.
+
+For retries and repeated gates, invoke the resolver again from the same stored scores and record a new evidence entry. Both ExecPhase and ExecTask reference this rule by name; do not duplicate or alter the policy inline.
+
+For workflows that need a standalone immutable routing record, copy `templates/task-routing-manifest.json`, fill it from the stored task scores and active policy version, then invoke the resolver with `--manifest <path>`. The resolver rejects combined-score or policy-version drift.
 
 ### GitHub Issue Map
 Single bridge file at `<tasks_folder>/github_issue_map.json`:
@@ -113,6 +118,9 @@ Before creating any issue, check `github_issue_map.json` and skip if already pre
 The markdown tracker is the source of truth. GitHub issues are a projection.
 
 ### On-Demand References
+- `references/codex-agent-routing.json` — canonical Path-2 score/role-to-profile policy. Read only when inspecting or changing routing; normal dispatches call the resolver.
+- `references/codex-agent-routing.schema.json` — machine-readable routing-policy shape. Read when changing or diagnosing policy configuration.
+- `references/codex-routing-scoring.md` — complexity/risk rubric plus routing-evidence format. Read during Plan-2-Tasks scoring or a legacy score backfill.
 - `references/recovery.md` — rollback procedure for unrecoverable tasks/branches. Read only on repeated Gate C failure or gate cap.
 - `references/issue_body_updates.md` — canonical fetch→Write→Edit→push pattern for GitHub issue body mutations. Read when first touching an issue body in a session.
 - `references/failure_modes.md` — failure-mode taxonomy for gate entries. Read when first writing a gate failure entry.
@@ -121,24 +129,30 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/project_sync.md` — gated GitHub Project board sync mechanics (active only when `autviam_c_config.json` → `project` names a board). Read when wiring or refreshing Project item status.
 
 ### Codex Agent Profiles
-Three bundled Codex prompt profiles are defined in `agents/`:
+Three bundled Markdown prompt profiles provide the role bodies used by the runtime profile installer:
 
-| Prompt profile | Codex agent type | Role | Invoked from |
+| Prompt profile | Runtime role | Role | Invoked from |
 |---|---|---|
-| `autviam-spec-reviewer` | `explorer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
-| `autviam-domain-reviewer` | `explorer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
-| `autviam-phase-orchestrator` | `worker` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
+| `autviam-spec-reviewer` | `reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
+| `autviam-domain-reviewer` | `reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
+| `autviam-phase-orchestrator` | `orchestrator` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
 
-**Codex mechanism:** there is no custom named-agent install step. Keep these files inside the skill and, when dispatching, prepend the relevant profile content to a `spawn_agent` prompt using the built-in `agent_type` listed above. If `spawn_agent` is unavailable, ExecPhase/ExecTask may run the reviewer profile inline and record that inline mode was used. E2E depends on Codex worker dispatch; if dispatch is unavailable, halt on the pre-flight check instead of silently degrading.
+Run `AutViam_C install` once in each consumer repository to generate the sixteen custom TOML profiles under `.codex/agents/`. The installer explicitly pins model, reasoning effort, and sandbox and then runs the exhaustive validator. Start a new Codex session after installation so the custom profiles are discoverable.
+
+At dispatch time, prepend the relevant Markdown profile content to the prompt and use only the custom `agent` returned by the resolver. Inline reviewer fallback is prohibited because it bypasses Path-2 routing evidence and independent review. If custom profile dispatch is unavailable, halt with a routing precondition failure.
 
 The implementer remains template-based (`templates/task_instructions_template.md`) because per-phase context is injected per dispatch.
 
 ### Bundled scripts
 
-Nine helper scripts live at `<skill_root>/scripts/` and run without an install step (reference them as `<skill_root>/scripts/<name>`). Seven are called by the commands for the deterministic, error-prone plumbing; the eighth and ninth, `phase-close.sh` (a PostToolUse hook backstop) and `draft_pr.sh` (the draft-PR opener, called both in-band and from the backstop), handle phase/plan finalization. The LLM keeps the judgment work (objectives, gate verdicts, prose attempt blocks, Decision narrative) around them.
+Thirteen helper scripts live at `<skill_root>/scripts/` (reference them as `<skill_root>/scripts/<name>`). The LLM keeps the judgment work (objectives, scoring, gate verdicts, prose attempt blocks, Decision narrative) around deterministic plumbing.
 
 | Script | Owns |
 |---|---|
+| `expand_codex_agents.py` | Deprecated compatibility entry point; always exits nonzero and directs callers to canonical `install_agent_profiles.py`, because template-derived profiles cannot pass exact managed-source validation. |
+| `install_agent_profiles.py` | Idempotently generates the sixteen explicit runtime TOML profiles in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and role instructions. |
+| `resolve_codex_agent.py` | Path-2 fail-closed resolver: validates stored scores, policy, role, selected TOML, model/effort fields, sandbox, reviewer floor, and the bounded Luna route; emits machine-readable dispatch evidence. |
+| `validate_codex_agent_routing.py` | Exhaustively validates all 125 score-role combinations, the full policy matrix, every referenced profile, sandbox compatibility, reviewer floor, Luna boundary, and built-in-agent prohibition. |
 | `init_plan.sh` | Per-plan plumbing for Plan-2-Tasks Step 7: slug derivation, folder scaffolding, label diff/create, `gh issue create` (prints the number), issue-map write, task-JSON `github_issue` annotation. |
 | `issue_body.sh` | The two `gh` halves of the canonical issue-body roundtrip (`fetch` → LLM edits → `push`) plus label-only / state / close flags. The LLM still does the Edit between fetch and push — never `sed -i`. |
 | `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |
@@ -167,9 +181,9 @@ No `task_issue` field — phase-issues-only.
 
 | Command | Owns these fields |
 |---|---|
-| Plan-2-Tasks | `task_id`, `title`, `phase`, `objective`, `plan_file`, `plan_lines`, `plan_assets`, `blocked_by`, `blocks`, `scope`, `implementation_steps`, `deliverables`, `acceptance_criteria`, `risks`, `test_plan.*` (initial), `status="pending"` |
-| ScaffoldPhase | `test_plan.*` (refined), `test_artifacts`, `verification_commands` |
-| ExecPhase / ExecTask | `status`, `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status`, `implementation_branch`, `completion_notes` |
+| Plan-2-Tasks | `task_id`, `title`, `phase`, `objective`, `plan_file`, `plan_lines`, `plan_assets`, `blocked_by`, `blocks`, `scope`, `implementation_steps`, `deliverables`, `acceptance_criteria`, `risks`, `complexity`, `risk`, `routing_evidence=[]`, `test_plan.*` (initial), `status="pending"` |
+| ScaffoldPhase | `routing_evidence` (append), `test_plan.*` (refined), `test_artifacts`, `verification_commands` |
+| ExecPhase / ExecTask | `routing_evidence` (append), `status`, `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status`, `implementation_branch`, `completion_notes` |
 
 ### Valid `asset_type` values for `plan_assets`
 `code_snippet`, `equation`, `diagram`, `table`, `constraint`.
@@ -178,11 +192,11 @@ No `task_issue` field — phase-issues-only.
 
 ## Post-Install Configuration (`autviam_c_config.json`)
 
-Run `AutViam_C install` once per repo to wire up repo-specific Codex prompt profiles and skills. The command scans optional repo-local Codex agent/profile folders and skill folders, proposes trigger patterns, gets user approval, and writes `<skill_root>/autviam_c_config.json`.
+Run `AutViam_C install` once per repo to generate and validate the required custom runtime profiles, then wire up optional repo-specific Codex prompt profiles and skills. The command scans optional repo-local profile and skill folders, proposes trigger patterns, gets user approval, and writes `<skill_root>/autviam_c_config.json`.
 
 **What the config enables:**
-- `domain_reviewer.specialists` — Codex `explorer` prompt profiles used as extra review lenses during Gate B when the diff touches matching files. Each specialist's findings carry the same weight as the domain reviewer's own findings. **By default the domain reviewer applies each lens inline** (reading its `prompt_file`) rather than `spawn_agent`-ing a separate agent — nested dispatch is usually unavailable in inline mode. See `agents/autviam-domain-reviewer.md`.
-- `spec_reviewer.specialists` — Codex `explorer` prompt profiles dispatched during Gate A (rare; most repos leave this empty).
+- `domain_reviewer.specialists` — read-only prompt lenses used during Gate B when the diff touches matching files. Each specialist's findings carry the same weight as the domain reviewer's own findings. **By default the routed domain reviewer applies each lens inline** (reading its `prompt_file`) rather than adding a nested dispatch. See `agents/autviam-domain-reviewer.md`.
+- `spec_reviewer.specialists` — read-only prompt lenses used during Gate A (rare; most repos leave this empty). Any separate specialist dispatch must itself resolve role `explorer` from the task's stored scores.
 - `implementer.skills` — skills surfaced to the implementer template when matching files changed.
 
 **Runtime mechanics (deterministic — no LLM at trigger time):**

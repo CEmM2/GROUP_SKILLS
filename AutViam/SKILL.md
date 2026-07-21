@@ -1,12 +1,9 @@
 ---
 name: AutViam
 description: >
-  Token-lean plan-to-execution pipeline. Decomposes plans into phased tasks,
-  scaffolds test coverage, executes through quality gates with a hard cap of
-  3 failures per gate, and mirrors progress to GitHub at the phase level only.
-  Successor to Aut_Faciam — same shape, ~40% lower token cost, agent-based reviewers,
-  phase-only GitHub issues. Use when the user invokes /AutViam, or mentions planning,
-  scaffolding, or executing phases via Plan-2-Tasks, ScaffoldPhase, ExecPhase, ExecTask.
+  Claude-native phased plan execution with immutable score routing, recursive
+  subagents, depth-aware tickets, test scaffolding, quality gates, and
+  phase-level GitHub tracking. Use for /AutViam.
 ---
 
 # AutViam — Plan → Scaffold → Execute
@@ -43,10 +40,18 @@ Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer
 
 ### Bundled scripts
 
-Nine helper scripts live at `<skill_root>/scripts/`. Seven own the **deterministic plumbing** the commands used to do by hand (slug/label/path work, gate counting, JSON writeback, git sequences, the `gh` calls); the eighth and ninth, `phase-close.sh` (a PostToolUse hook backstop) and `draft_pr.sh` (the draft-PR opener, called both in-band and from the backstop), handle phase/plan finalization. They run without an install step — reference them as `<skill_root>/scripts/<name>`. The LLM keeps Write/Edit for everything reviewable (issue bodies between fetch/push, gate prose+JSON attempt blocks, the Decision narrative).
+Seventeen helper scripts live at `<skill_root>/scripts/`. Existing plan/GitHub scripts retain their responsibilities; the routing scripts deterministically generate Claude agents, resolve immutable task routing, issue and validate depth-aware tickets, audit subagent starts, check environment overrides, and record live depth probes.
 
 | Script | Owns |
 |---|---|
+| `install_claude_agent_profiles.py` | Generates and exact-validates 22 model/effort/capability-specific `.claude/agents/*.md` profiles from six canonical prompt sources; safely merges hooks/config and reports restart requirements. |
+| `resolve_claude_agent.py` | Reads persistent task routing, validates role/purpose/topology/depth, selects one generated agent, issues a single-use ticket, and appends serialized evidence. |
+| `validate_claude_agent_routing.py` | Exhaustively checks 175 score-role-capability routes, exact generated content, reviewer floor, Haiku boundary, tools, duplicate names, and active command usage. |
+| `validate_agent_dispatch.py` | Blocking `PreToolUse` hook for AutViam Agent calls; validates and consumes tickets and rejects wrong agents, reuse, expiry, and depth overruns. |
+| `check_claude_routing_environment.py` | Blocks `CLAUDE_CODE_SUBAGENT_MODEL` / `CLAUDE_CODE_EFFORT_LEVEL` in strict mode or labels evidence externally overridden in permissive mode. |
+| `probe_nested_dispatch.py` | Prepares and validates evidence from a bounded no-write recursive Agent probe, then records the verified maximum depth and resolves auto mode. |
+| `audit_subagent_start.py` | Audit-only `SubagentStart` logger for generated AutViam agent identity and runtime-reported depth. |
+| `claude_routing_common.py` | Shared atomic I/O, locks, frontmatter parsing, hashing, and legacy-config normalization. |
 | `init_plan.sh` | Plan-2-Tasks Step 7 plumbing: `slug`, `dirs` (json/gates/reviews), `labels` (diff-only create), `create-issue` (prints #), `map`, `annotate`. |
 | `issue_body.sh` | The canonical issue-body roundtrip `gh` halves: `fetch`, `push` (body + label swap + close/state flags), `label` (label-only). LLM does the Edit/MultiEdit between fetch and push. |
 | `gate_state.py` | Gate-file + task-JSON state: `init`/`init-task`, `count`/`cap-check`/`sync-counters` (the 3-failure cap, durable from the file), `complete`/`set-status`/`reset-task`, `last-good-sha`, `reset-packet`. |
@@ -83,13 +88,20 @@ The pipeline isolates each plan on its own branch + git worktree so phases merge
 ### Subagent JSON Passing Discipline
 Never paste full task JSON content into a subagent prompt. Always pass the file path and the field list it needs. The subagent runs one Read. This eliminates re-paying multi-KB JSON on every gate retry.
 
-### Model Assignment (single source of truth)
-Computed once per task from `complexity + risk` (each 1–5):
-- combined > 6 → **Opus** for implementer and reviewer agents
-- complexity ≥ 3 OR risk ≥ 3 → **Sonnet or Opus**
-- **Haiku** is permitted only for read-only / search subtasks (e.g. test discovery), never for implementer or reviewer roles
+### Claude Agent Assignment (single source of truth)
 
-Both ExecPhase and ExecTask reference this rule by name; do not re-state it inline.
+Use `references/claude-agent-routing.json` as the routing policy and `references/claude-routing-scoring.md` only when Plan-2-Tasks scores a task or an explicit legacy initializer fills an absent routing object. Never rescore during execution.
+
+Before every Agent dispatch:
+
+1. Run `check_claude_routing_environment.py`; strict-mode overrides are fatal.
+2. Invoke `resolve_claude_agent.py` with the task JSON, role, purpose, current/next depth, optional parent ticket, and task evidence path. For a phase orchestrator, pass `--phase-id` and the phase evidence file; the resolver derives maximum scores from the canonical phase task JSONs.
+3. Parse its JSON and dispatch exactly `agent`; include `autviam_routing_ticket: <ticket_path>` in the prompt. Never pass an Agent `model` argument.
+4. Treat missing routing, policy mismatch, invalid purpose/edge/capability, exhausted blocking depth, missing profile, hook rejection, or dispatch failure as fatal. Do not use a legacy base agent or generic fallback.
+
+The policy selects Sonnet medium/high or Opus high/xhigh from immutable 1–5 scores. Gate reviewers apply a floor: routine work uses Sonnet high; moderate/elevated work uses Opus high. Haiku is reachable only through `mechanical_read_only` with both scores at most 2 and never writes or reviews.
+
+`autviam_config.json` owns topology, not models: `nested_dispatch.mode`, `max_depth`, detected/declared `runtime_max_depth`, phase-orchestrator child permissions, specialist mode (`nested|caller|off`), and depth exhaustion (`caller|block`). The resolver requires each child edge to be allowed and each depth to fit both ceilings.
 
 ### GitHub Issue Map
 Single bridge file at `<tasks_folder>/github_issue_map.json`:
@@ -133,15 +145,18 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 - `references/project_sync.md` — gated GitHub Project board sync mechanics (active only when `autviam_config.json` → `project` names a board). Read when wiring or refreshing Project item status.
 
 ### Subagents
-Three named Claude Code subagents are defined in `agents/`:
+Six canonical Claude prompt sources are defined in `agents/`:
 
 | Agent | Role | Invoked from |
 |---|---|---|
-| `autviam-spec-reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
-| `autviam-domain-reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
-| `autviam-phase-orchestrator` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
+| `autviam-implementer` | Implementation rules | generated implementer profiles |
+| `autviam-spec-reviewer` | Gate A | generated leaf Gate A profiles |
+| `autviam-domain-reviewer` | Gate B | generated flat/nested Gate B profiles |
+| `autviam-explorer` | Read-only specialist work | generated explorer profiles |
+| `autviam-search` | Mechanical read-only work | generated Haiku profile |
+| `autviam-phase-orchestrator` | One routed phase | generated orchestrator profiles |
 
-**Install (once per consuming repo):** symlink or copy `agents/*.md` into `.claude/agents/` so Claude Code picks them up. If a reviewer agent is missing, ExecPhase/ExecTask fall back to inlined Task-tool dispatch with the agent's system prompt. The orchestrator has no fallback — if it's missing or nested dispatch is blocked, E2E halts on its pre-flight check (see `commands/E2E.md` § Nested-Dispatch Pre-flight).
+**Install once per consuming repo:** run `scripts/install_claude_agent_profiles.py`. It generates 22 explicit profiles in `.claude/agents/`; canonical source files are prompt inputs and must not be invoked directly. Restart or reload Claude Code after generation. Missing generated profiles have no fallback.
 
 The implementer remains template-based (`templates/task_instructions_template.md`) because per-phase context is injected per dispatch.
 
@@ -163,9 +178,9 @@ No `task_issue` field — phase-issues-only.
 
 | Command | Owns these fields |
 |---|---|
-| Plan-2-Tasks | `task_id`, `title`, `phase`, `objective`, `plan_file`, `plan_lines`, `plan_assets`, `blocked_by`, `blocks`, `scope`, `implementation_steps`, `deliverables`, `acceptance_criteria`, `risks`, `test_plan.*` (initial), `status="pending"` |
-| ScaffoldPhase | `test_plan.*` (refined), `test_artifacts`, `verification_commands` |
-| ExecPhase / ExecTask | `status`, `completion_date`, `test_completion`, `review_score`, `review_breakdown`, `review_status`, `implementation_branch`, `completion_notes` |
+| Plan-2-Tasks | `task_id`, task/spec fields, `routing.*`, `routing_evidence=[]`, `test_plan.*` (initial), `status="pending"` |
+| ScaffoldPhase | `routing_evidence` (append), `test_plan.*` (refined), `test_artifacts`, `verification_commands` |
+| ExecPhase / ExecTask | `routing_evidence` (append), completion, tests, review, branch, and notes fields; never `routing.*` |
 
 ### Valid `asset_type` values for `plan_assets`
 `code_snippet`, `equation`, `diagram`, `table`, `constraint`.
@@ -174,30 +189,24 @@ No `task_issue` field — phase-issues-only.
 
 ## Post-Install Configuration (`autviam_config.json`)
 
-Run `/AutViam install` once per repo to wire up repo-specific specialists. The command
-scans `.claude/agents/` and `.claude/skills/`, proposes trigger patterns, gets user
-approval, and writes `<skill_root>/autviam_config.json`.
+Run `/AutViam install` once per repo to generate/validate runtime profiles and hooks, migrate legacy config, and wire repo-specific specialists.
 
 **What the config enables:**
-- `domain_reviewer.specialists` — extra review lenses applied during Gate B when the diff
-  touches matching files. Each specialist's findings carry the same weight as the domain
-  reviewer's own findings. **By default the domain reviewer applies each lens inline** (reading
-  its `prompt_file`) rather than dispatching a separate agent — nested dispatch is unavailable
-  in inline/Phase mode, the default. See `agents/autviam-domain-reviewer.md`.
+- `nested_dispatch.domain_reviewer.specialists` selects `nested`, `caller`, or `off` behavior for matched Gate B lenses. Nested dispatch uses routed explorer children; caller mode passes routed explorer reports into flat Gate B; off runs standard review only.
 - `spec_reviewer.specialists` — agents dispatched during Gate A (rare; most repos leave
   this empty).
 - `implementer.skills` — skills surfaced to the implementer template (future).
 
 **Runtime mechanics (deterministic — no LLM at trigger time):**
 
-Before dispatching the domain reviewer, ExecPhase/ExecTask runs:
+For `nested` and `caller`, ExecPhase/ExecTask runs:
 ```bash
 <skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>
 ```
 which emits the JSON array of config entries whose `trigger_patterns` match at least one file in
-`git diff --name-only <base_sha>..<head_sha>` (OR logic). That array is the `specialist_agents` list
-injected into the domain reviewer prompt. An empty array (no config, empty section, or no match) means
-standard review — fully backward compatible with repos that have no config. The implementer skill check
+`git diff --name-only <base_sha>..<head_sha>` (OR logic). Nested mode injects that array as
+`specialist_agents`; caller mode dispatches routed explorers and injects only their `specialist_reports`;
+off mode skips matching and injects neither. An empty array means standard review. The implementer skill check
 and Gate A spec-reviewer specialist check use the same script with the `implementer.skills` /
 `spec_reviewer.specialists` section.
 

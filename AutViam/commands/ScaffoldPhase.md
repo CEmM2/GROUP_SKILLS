@@ -14,6 +14,8 @@ Also check the phase's label in `github_issue_map.json`: if `scaffolded` is alre
 
 ## Step 1 — Load context (no full plan re-read)
 
+Before branch setup, run `check_claude_routing_environment.py` and `validate_claude_agent_routing.py` against the installed `.claude/agents`. Validate the structured/legacy-normalized config. A failure is `blocked-by-precondition`.
+
 Read:
 - `<tasks_folder>/Phase_<phase_id>_context_summary.md` — your primary reference
 - `<tasks_folder>/all-tasks.md` — to identify tasks in this phase
@@ -68,13 +70,14 @@ Write `<tasks_folder>/Phase_<phase_id>_Scaffold_Validation.md`:
 
 `Scaffold Action` is `auto-filled` or `needs-human-review`. Don't block the phase on `needs-human-review` — continue scaffolding and surface the gap in the summary.
 
-## Step 4 — Generate test stubs (parallel subagents, Haiku OK)
+## Step 4 — Generate test stubs (parallel routed implementers)
 
-For each task in `<phase_id>`, dispatch a subagent (Haiku model — read-and-template work). Spawn all in parallel, one per task, up to 4 concurrent.
+For each task, require complete persistent `routing`; never rescore it. Invoke `resolve_claude_agent.py --task-json <task-json> --role implementer --purpose scaffold --depth <next-depth> --parent-ticket <if any> --evidence-file <same-task-json>`, then dispatch exactly its generated `agent` with the ticket path in the prompt. Test-stub writing is implementation and must never use Haiku. Spawn up to four non-overlapping tasks concurrently. A routing, hook, or dispatch failure is fatal.
 
 **Pass to each subagent (do NOT paste the JSON):**
 
 ```
+autviam_routing_ticket: <resolver.ticket_path>
 task_json_path: <tasks_folder>/json/<task_id>.json
 phase_context_path: <tasks_folder>/Phase_<phase_id>_context_summary.md
 test_layout_summary: <the single string from Step 2>
@@ -89,7 +92,7 @@ qmd_search_terms: <2-3 representative terms from objective>
 4. Determine the test file path: follow the layout in `test_layout_summary`. Stub filename is always `test_<task_id>.py`. Place it at `tests/plan_tests/test_<task_id>.py` whether or not `tests/plan_tests/` already exists — create the directory if missing.
 5. Generate one stub per `partial`/`missing` case:
 
-   ```python
+   ```text
    import pytest
 
    class TestTask<TaskId>:
@@ -106,6 +109,8 @@ qmd_search_terms: <2-3 representative terms from objective>
    - For each case: classification + (existing test path or new stub function name)
 
 Wait for all subagents.
+
+Record each selected agent, model, effort, capability, parent, depth, policy, enforcement mode, and ticket in the scaffold validation report; the resolver also appends the complete evidence to the task JSON.
 
 ## Step 5 — Update task JSONs
 

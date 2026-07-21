@@ -1,5 +1,6 @@
-Codex worker agent:
-  reasoning_effort: [per SKILL.md § Codex Agent Assignment]
+Codex routed implementation agent:
+  agent_profile: [exact `agent` from resolve_codex_agent.py]
+  routing_evidence: [complete resolver output recorded by the dispatcher]
   description: "Implement Task <task_id>: <task_title>"
   prompt: |
     You are implementing Task <task_id>: <task_title>.
@@ -8,7 +9,8 @@ Codex worker agent:
 
     - **Spec:** Read `<task_json_path>`. Use the fields: `objective`, `acceptance_criteria`,
       `scope`, `implementation_steps`, `deliverables`, `risks`, `test_plan`, `test_artifacts`,
-      `verification_commands`. Ignore status / completion / review / branch / github_issue fields.
+      `verification_commands`. Treat `complexity` and `risk` as immutable; do not recompute them.
+      Ignore status / completion / review / branch / github_issue fields.
     - **Phase context:** Read `<phase_context_path>`.
     - **Handoff (if provided):** Read `<handoff_path>`.
     - **Plan excerpts (if provided):** the orchestrator has pasted only the `plan_lines`
@@ -48,7 +50,7 @@ Codex worker agent:
     2. Run all task-relevant tests; iterate until ≥ 95% pass.
     3. Dry-run failure-route analysis: read every modified file, identify uncovered
        failure paths, add tests, re-iterate until ≥ 95% pass on the full set.
-    4. Do not commit unless the caller explicitly asks you to. In Codex, worker changes may
+    4. Do not commit unless the caller explicitly asks you to. In Codex, delegated changes may
        return to the caller for review/integration; the caller owns final commits and branch state.
     5. Self-review (below).
     6. Report back (format below).

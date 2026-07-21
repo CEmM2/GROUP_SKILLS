@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutViam_C Codex agent routing policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_version",
+    "base_tier_by_score",
+    "profiles_by_role_and_tier",
+    "special_routes",
+    "failure_policy"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "policy_version": { "type": "string", "minLength": 1 },
+    "base_tier_by_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["1", "2", "3", "4", "5"],
+      "properties": {
+        "1": { "$ref": "#/$defs/score_row" },
+        "2": { "$ref": "#/$defs/score_row" },
+        "3": { "$ref": "#/$defs/score_row" },
+        "4": { "$ref": "#/$defs/score_row" },
+        "5": { "$ref": "#/$defs/score_row" }
+      }
+    },
+    "profiles_by_role_and_tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementer", "orchestrator", "reviewer", "explorer"],
+      "properties": {
+        "implementer": { "$ref": "#/$defs/tier_profiles" },
+        "orchestrator": { "$ref": "#/$defs/tier_profiles" },
+        "reviewer": { "$ref": "#/$defs/tier_profiles" },
+        "explorer": { "$ref": "#/$defs/tier_profiles" }
+      }
+    },
+    "special_routes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanical_read_only"],
+      "properties": {
+        "mechanical_read_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maximum_complexity",
+            "maximum_risk",
+            "agent",
+            "fallback_role"
+          ],
+          "properties": {
+            "maximum_complexity": { "type": "integer", "minimum": 1, "maximum": 5 },
+            "maximum_risk": { "type": "integer", "minimum": 1, "maximum": 5 },
+            "agent": { "$ref": "#/$defs/agent_name" },
+            "fallback_role": { "const": "explorer" }
+          }
+        }
+      }
+    },
+    "failure_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invalid_score",
+        "unknown_role",
+        "missing_route",
+        "missing_agent_profile",
+        "unconfigured_model_or_effort"
+      ],
+      "properties": {
+        "invalid_score": { "const": "error" },
+        "unknown_role": { "const": "error" },
+        "missing_route": { "const": "error" },
+        "missing_agent_profile": { "const": "error" },
+        "unconfigured_model_or_effort": { "const": "error" }
+      }
+    }
+  },
+  "$defs": {
+    "tier": {
+      "enum": ["terra_medium", "terra_high", "sol_high", "sol_xhigh"]
+    },
+    "score_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["1", "2", "3", "4", "5"],
+      "properties": {
+        "1": { "$ref": "#/$defs/tier" },
+        "2": { "$ref": "#/$defs/tier" },
+        "3": { "$ref": "#/$defs/tier" },
+        "4": { "$ref": "#/$defs/tier" },
+        "5": { "$ref": "#/$defs/tier" }
+      }
+    },
+    "agent_name": {
+      "type": "string",
+      "pattern": "^(?!worker$|explorer$|default$)[a-z][a-z0-9_]*$"
+    },
+    "tier_profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terra_medium", "terra_high", "sol_high", "sol_xhigh"],
+      "properties": {
+        "terra_medium": { "$ref": "#/$defs/agent_name" },
+        "terra_high": { "$ref": "#/$defs/agent_name" },
+        "sol_high": { "$ref": "#/$defs/agent_name" },
+        "sol_xhigh": { "$ref": "#/$defs/agent_name" }
+      }
+    }
+  }
+}

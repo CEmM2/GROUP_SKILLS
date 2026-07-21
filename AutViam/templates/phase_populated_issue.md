@@ -2,9 +2,9 @@
 
 **Status:** ✅ Scaffolded
 **Plan overview:** #<plan_overview_issue_number>
-**Context:** [`Phase_<N>_context_summary.md`](<rel_path>)
+**Context:** `Phase_<N>_context_summary.md` (`<rel_path>`)
 <!-- Phase 2+: filled by ExecPhase Step 10 once the previous phase completes -->
-**Handoff in:** [`Handoff_Phase_<N>.md`](<rel_path>)
+**Handoff in:** `Handoff_Phase_<N>.md` (`<rel_path>`)
 
 ### Scaffold Summary
 | Metric | Value |

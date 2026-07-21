@@ -36,7 +36,7 @@ tests/ layout — unit (38 files under tests/unit/), integration (12 under tests
 plan_tests (4 under tests/plan_tests/). Naming pattern: test_<feature>.py with TestX classes.
 ```
 
-This single string is reused for every Codex worker in Step 4. Do **not** re-run the test discovery per task.
+This single string is reused for every routed scaffold agent in Step 4. Do **not** re-run the test discovery per task.
 
 ## Step 3 — Validate task JSONs
 
@@ -68,11 +68,11 @@ Create or update `<tasks_folder>/Phase_<phase_id>_Scaffold_Validation.md`:
 
 `Scaffold Action` is `auto-filled` or `needs-human-review`. Don't block the phase on `needs-human-review` — continue scaffolding and surface the gap in the summary.
 
-## Step 4 — Generate test stubs (parallel Codex workers)
+## Step 4 — Generate test stubs (parallel routed agents)
 
-For each task in `<phase_id>`, dispatch a Codex `worker` with low or medium reasoning effort (read-and-template work). Spawn all in parallel, one per task, up to 4 concurrent.
+For each task in `<phase_id>`, apply SKILL.md § Codex Agent Assignment with `--task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose scaffold`, and dispatch exactly the custom profile returned by the resolver. If a legacy task lacks either score, assign both once with `references/codex-routing-scoring.md`, write them to its JSON, and mark `legacy_score_backfill: true` before invoking the resolver. Never pass copied task scores with raw `--complexity/--risk`. Spawn all eligible agents in parallel, one per task, up to 4 concurrent. A routing failure is fatal; do not substitute a built-in profile.
 
-**Pass to each worker (do NOT paste the JSON):**
+**Pass to each routed agent (do NOT paste the JSON):**
 
 ```
 task_json_path: <tasks_folder>/json/<task_id>.json
@@ -105,7 +105,7 @@ qmd_search_terms: <2-3 representative terms from objective>
    - Stub path written (or "all cases covered, no stub")
    - For each case: classification + (existing test path or new stub function name)
 
-Wait for all workers.
+Wait for all routed agents.
 
 ## Step 5 — Update task JSONs
 

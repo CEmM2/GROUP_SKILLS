@@ -1,0 +1,77 @@
+{
+  "$schema": "./claude-agent-routing-schema.json",
+  "schema_version": 1,
+  "policy_version": "2026-07-21",
+  "models": {
+    "opus": {"value": "opus", "supported_efforts": ["low", "medium", "high", "xhigh", "max"]},
+    "sonnet": {"value": "sonnet", "supported_efforts": ["low", "medium", "high", "max"]},
+    "haiku": {"value": "haiku", "supported_efforts": []}
+  },
+  "base_tier_by_score": {
+    "1": {"1": "sonnet_medium", "2": "sonnet_medium", "3": "sonnet_high", "4": "opus_high", "5": "opus_xhigh"},
+    "2": {"1": "sonnet_medium", "2": "sonnet_medium", "3": "sonnet_high", "4": "opus_high", "5": "opus_xhigh"},
+    "3": {"1": "sonnet_high", "2": "sonnet_high", "3": "sonnet_high", "4": "opus_high", "5": "opus_xhigh"},
+    "4": {"1": "opus_high", "2": "opus_high", "3": "opus_high", "4": "opus_high", "5": "opus_xhigh"},
+    "5": {"1": "opus_xhigh", "2": "opus_xhigh", "3": "opus_xhigh", "4": "opus_xhigh", "5": "opus_xhigh"}
+  },
+  "profiles_by_role_and_tier": {
+    "implementer": {
+      "sonnet_medium": "autviam-implementer-sonnet-medium",
+      "sonnet_high": "autviam-implementer-sonnet-high",
+      "opus_high": "autviam-implementer-opus-high",
+      "opus_xhigh": "autviam-implementer-opus-xhigh"
+    },
+    "orchestrator": {
+      "sonnet_medium": "autviam-phase-orchestrator-sonnet-medium",
+      "sonnet_high": "autviam-phase-orchestrator-sonnet-high",
+      "opus_high": "autviam-phase-orchestrator-opus-high",
+      "opus_xhigh": "autviam-phase-orchestrator-opus-xhigh"
+    },
+    "spec_reviewer": {
+      "sonnet_medium": "autviam-spec-reviewer-sonnet-high",
+      "sonnet_high": "autviam-spec-reviewer-opus-high",
+      "opus_high": "autviam-spec-reviewer-opus-high",
+      "opus_xhigh": "autviam-spec-reviewer-opus-xhigh"
+    },
+    "domain_reviewer": {
+      "sonnet_medium": "autviam-domain-reviewer-sonnet-high",
+      "sonnet_high": "autviam-domain-reviewer-opus-high",
+      "opus_high": "autviam-domain-reviewer-opus-high",
+      "opus_xhigh": "autviam-domain-reviewer-opus-xhigh"
+    },
+    "explorer": {
+      "sonnet_medium": "autviam-explorer-sonnet-medium",
+      "sonnet_high": "autviam-explorer-sonnet-high",
+      "opus_high": "autviam-explorer-opus-high",
+      "opus_xhigh": "autviam-explorer-opus-xhigh"
+    }
+  },
+  "special_routes": {
+    "mechanical_read_only": {
+      "maximum_complexity": 2,
+      "maximum_risk": 2,
+      "agent": "autviam-search-haiku",
+      "fallback_role": "explorer"
+    }
+  },
+  "capabilities": {
+    "domain_reviewer": ["flat", "nested"],
+    "other_roles": ["leaf"]
+  },
+  "spawn_edges": {
+    "main": ["implementer", "orchestrator", "spec_reviewer", "domain_reviewer", "explorer", "mechanical_read_only"],
+    "orchestrator": ["implementer", "spec_reviewer", "domain_reviewer"],
+    "domain_reviewer": ["explorer"]
+  },
+  "purpose_roles": {
+    "scaffold": ["implementer"],
+    "implementer": ["implementer"],
+    "gate-a": ["spec_reviewer"],
+    "gate-b": ["domain_reviewer"],
+    "specialist": ["explorer"],
+    "mechanical-search": ["mechanical_read_only"],
+    "phase-orchestrator": ["orchestrator"],
+    "nested-probe": ["orchestrator", "spec_reviewer"]
+  },
+  "ticket_ttl_seconds": 300
+}

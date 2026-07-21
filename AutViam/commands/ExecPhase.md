@@ -8,6 +8,8 @@ Execute all tasks in a phase through gates A → B → C, enforce the 3-failure-
 
 ## Step 1 — Load context (no full plan re-read)
 
+Run `check_claude_routing_environment.py` and `validate_claude_agent_routing.py` before branch setup. Normalize legacy config strings in memory. Read the current depth and parent ticket from the dispatch context; inline Phase starts at depth 0. Any missing profile, override, invalid topology, or policy mismatch is `blocked-by-precondition`.
+
 Read in this order:
 - `<tasks_folder>/Phase_<phase_id>_context_summary.md` — primary context
 - `<tasks_folder>/all-tasks.md` — to identify tasks in this phase and their cross-phase blockers
@@ -22,14 +24,14 @@ For `<phase_id>` > 1: read `<tasks_folder>/Handoff_Phase_<phase_id>.md` in full.
 
 ## Step 2 — Task analysis
 
-For each task in `<phase_id>`, write to `<tasks_folder>/Phase_<phase_id>_Tasks_analysis.md`:
+For each task, read—not recompute—its complete immutable `routing` and write to `<tasks_folder>/Phase_<phase_id>_Tasks_analysis.md`:
 
 ```
 | Task ID | Title | Complexity (1-5) | Risk (1-5) | Combined | Blocked By | Blocks |
 |---|---|---|---|---|---|---|
 ```
 
-Apply the model assignment rule from SKILL.md § Model Assignment — do not restate it here.
+Resolve and show the implementer, Gate A, Gate B capability variant, and explorer names. Gate B is nested only when specialist mode is `nested` and the next depth fits; caller/off or caller depth fallback uses flat. A legacy task may be initialized exactly once with `resolve_claude_agent.py --initialize`; existing routing can never be overwritten.
 
 ## Step 3 — Branch setup
 
@@ -46,7 +48,7 @@ Never implement on `main`/`master` without explicit user consent.
 
 ## Step 5 — Implementer dispatch (per task)
 
-Dispatch via the Task tool using `templates/task_instructions_template.md`. The template tells the implementer to `Read` the task JSON itself — **do not paste JSON content into the prompt**.
+Immediately before dispatch, invoke `resolve_claude_agent.py --task-json <task-json> --role implementer --purpose implementer --depth <next-depth> --parent-ticket <if any> --evidence-file <same-task-json>`. Dispatch exactly its generated agent using `templates/task_instructions_template.md`, including `autviam_routing_ticket`. Do not paste JSON, pass a model override, use a legacy base agent, or fall back inline.
 
 **Pre-dispatch skill check (deterministic):**
 → run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json implementer.skills <pre-task SHA> <current HEAD>`. It emits a JSON array of the matched `implementer.skills` config entries (each carrying its `skill`/`skill_md`) — entries whose `trigger_patterns` hit at least one file in the diff. Absent config or empty section → `[]`.
@@ -77,10 +79,11 @@ After each implementer reports completion, run gates in order. **No `gh` calls d
 
 ### Gate A — Spec Compliance
 
-Dispatch the `autviam-spec-reviewer` agent:
+Resolve role `spec_reviewer` with purpose `gate-a` from the same task routing immediately before every Gate A attempt, then dispatch exactly the returned generated leaf agent:
 
 ```
-Agent(subagent_type="autviam-spec-reviewer", prompt="""
+Agent(subagent_type="<resolver.agent>", prompt="""
+autviam_routing_ticket: <resolver.ticket_path>
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>
@@ -89,7 +92,7 @@ prior_failure_summary: <only if retry — copy the Issues list from the prior ga
 """)
 ```
 
-If the agent is not installed, fall back to dispatching the Task tool with the agent's system prompt inlined (see `agents/autviam-spec-reviewer.md`).
+If resolution, hook validation, or dispatch fails, stop with `blocked-by-precondition`; there is no generic or inline review fallback.
 
 Parse the verdict line. On FAIL: **you author** the failure entry in the gates file (1–2 sentences of domain prose + the ```json``` attempt block with `failure_mode`, `what_failed`, `why`). Then run `gate_state.py cap-check <gates_file> <task_id> A` (and `sync-counters`); on `CAP-HIT` go to Step 7, else pass the agent's Issues list to the implementer, ask it to fix, and re-run Gate A.
 
@@ -97,14 +100,20 @@ Parse the verdict line. On FAIL: **you author** the failure entry in the gates f
 
 Only after Gate A passes.
 
-**Pre-dispatch specialist check (deterministic):**
-→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>`. It emits the JSON array of `domain_reviewer.specialists` config entries whose `trigger_patterns` match at least one file in the diff (OR logic). Absent config or empty section → `[]`.
-Use that array as `specialist_agents`. If it is empty, omit the `specialist_agents` line from the prompt below (backward compatible — reviewer skips the specialist section entirely).
+**Pre-dispatch specialist check (deterministic):** read `nested_dispatch.domain_reviewer.specialists`, then branch exactly:
 
-Dispatch `autviam-domain-reviewer`:
+- `off` — do not run the matcher. Omit both `specialist_agents` and `specialist_reports`; Gate B performs only its standard review.
+- `nested` — run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>` and pass the matched array as `specialist_agents` to the nested Gate B profile. An empty array omits the field.
+- `caller` (or caller depth fallback) — run the same matcher. The nearest caller whose spawn edge permits `explorer` resolves each matched lens with role `explorer`, purpose `specialist`, and the task's immutable routing, dispatches it, and collects its report. Pass the reports as `specialist_reports` to flat Gate B; never pass `specialist_agents` to a flat profile.
+
+When this command is running inside a phase orchestrator, that orchestrator's allowlist intentionally excludes explorers. If caller-mode reports are required, stop before Gate B and return `status: "caller-specialists-required"` with the task ID, SHAs, matched lenses, and resume packet. E2E dispatches the explorers from the main session and resumes the orchestrator with the resulting report path. Do not apply the lenses inline and do not silently omit them.
+
+Resolve role `domain_reviewer` with purpose `gate-b` and capability `auto`. The resolver selects `-nested` only when specialist topology and depth permit it; otherwise it selects `-flat` or blocks per config. Then dispatch exactly the resolved Gate B agent:
 
 ```
-Agent(subagent_type="autviam-domain-reviewer", prompt="""
+Agent(subagent_type="<resolver.agent>", prompt="""
+autviam_routing_ticket: <resolver.ticket_path>
+skill_root: <absolute skill_root>
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>
@@ -112,7 +121,8 @@ implementer_report: <one-line summary>
 phase_context_path: <tasks_folder>/Phase_<phase_id>_context_summary.md
 design_docs_dir: dev/design_docs/   # if exists
 prior_failure_summary: <only if retry>
-specialist_agents: <JSON list — omit line if empty>
+specialist_agents: <JSON list — nested only; omit if empty>
+specialist_reports: <JSON list or report path — caller only; omit if empty/off>
 """)
 ```
 

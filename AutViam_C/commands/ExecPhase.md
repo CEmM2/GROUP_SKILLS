@@ -22,14 +22,16 @@ For `<phase_id>` > 1: read `<tasks_folder>/Handoff_Phase_<phase_id>.md` in full.
 
 ## Step 2 — Task analysis
 
-For each task in `<phase_id>`, write to `<tasks_folder>/Phase_<phase_id>_Tasks_analysis.md`:
+For each task in `<phase_id>`, read the stored `complexity` and `risk` and write them to `<tasks_folder>/Phase_<phase_id>_Tasks_analysis.md`:
 
-```
+```markdown
 | Task ID | Title | Complexity (1-5) | Risk (1-5) | Combined | Blocked By | Blocks |
 |---|---|---|---|---|---|---|
 ```
 
-Apply the Codex agent assignment rule from SKILL.md § Codex Agent Assignment — do not restate it here.
+Do not recompute existing scores. For a legacy task missing either value, use `references/codex-routing-scoring.md` to assign both once, write them into its task JSON, and mark the analysis rationale `legacy_score_backfill: true`.
+
+Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, dispatch purpose, and UTC timestamp to that same task JSON's `routing_evidence` array using the format in `references/codex-routing-scoring.md`. A nonzero resolver exit or unavailable returned profile is a fatal `blocked-by-precondition`; do not use a built-in or inline fallback.
 
 ## Step 3 — Branch setup
 
@@ -40,15 +42,15 @@ It checks out `<plan_slug>_phase-<phase_id>`, creating it from the **plan branch
 ## Step 4 — Execution order
 
 1. **Never start a task whose blockers aren't `status="done"` in their JSONs.**
-2. **Parallel first pass:** identify tasks where `complexity ≤ 3 AND risk ≤ 3 AND all blockers done`. Dispatch up to 4 concurrent Codex workers. Before each batch, check that no two tasks in the batch modify the same file (compare `deliverables` and `scope`); if they would, sequence them.
+2. **Parallel first pass:** identify tasks where `complexity ≤ 3 AND risk ≤ 3 AND all blockers done`. Dispatch up to 4 concurrent routed implementation agents. Before each batch, check that no two tasks in the batch modify the same file (compare `deliverables` and `scope`); if they would, sequence them.
 3. **Sequential high-risk:** tasks where complexity OR risk > 3 run one at a time. After all gates pass, commit each high-risk task separately.
 4. After each batch, re-evaluate eligibility.
 
 ## Step 5 — Implementer dispatch (per task)
 
-Dispatch a Codex `worker` using `templates/task_instructions_template.md`. The template tells the implementer to read the task JSON itself — **do not paste JSON content into the prompt**.
+Run the resolver with `--task-json <tasks_folder>/json/<task_id>.json --role implementer --evidence-file <same-task-json> --purpose implementer`, then dispatch exactly the returned custom profile using `templates/task_instructions_template.md`. The template tells the implementer to read the task JSON itself — **do not paste JSON content into the prompt**.
 
-Codex workers may operate in forked workspaces. The calling agent remains responsible for reviewing/integrating returned changes into the current workspace, running Gate C, and creating commits after gates pass. If the environment applies worker edits directly, still treat the main pipeline as the owner of branch state and commits.
+Routed implementation agents may operate in forked workspaces. The calling agent remains responsible for reviewing/integrating returned changes into the current workspace, running Gate C, and creating commits after gates pass. If the environment applies agent edits directly, still treat the main pipeline as the owner of branch state and commits.
 
 **Pre-dispatch skill check (deterministic):**
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json implementer.skills <pre-task SHA> <current HEAD>`
@@ -86,10 +88,10 @@ On the **3rd** failure of any one gate, the next attempt is the last. When `cap-
 
 ### Gate A — Spec Compliance
 
-Dispatch the `autviam-spec-reviewer` prompt profile as a Codex `explorer`:
+Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-a`, then dispatch the `autviam-spec-reviewer` prompt body through exactly the returned custom profile:
 
-```
-spawn_agent(agent_type="explorer", message="""
+```text
+spawn_agent(agent_type="<resolver.agent>", message="""
 Use `<skill_root>/agents/autviam-spec-reviewer.md` as your prompt profile.
 
 task_json_path: <tasks_folder>/json/<task_id>.json
@@ -100,7 +102,7 @@ prior_failure_summary: <only if retry — copy the Issues list from the prior ga
 """)
 ```
 
-If Codex agent dispatch is unavailable, load `agents/autviam-spec-reviewer.md` and perform the Gate A review inline. Record `review_mode="inline"` in the gate entry.
+If the returned custom profile cannot be dispatched, stop with `blocked-by-precondition`. Do not perform Gate A inline or use a built-in profile.
 
 Parse the verdict line. On FAIL: record the failure entry in the gates file (1–2 sentences + JSON block with `gate:"A"`, `result:"fail"`, `failure_mode`, `what_failed`, `why`), then run `gate_state.py cap-check … <task_id> A` (→ Step 7 on `CAP-HIT`) and `gate_state.py sync-counters … <task_id>`. Pass the agent's Issues list to the implementer, ask it to fix, re-run Gate A.
 
@@ -115,10 +117,10 @@ It prints the JSON array of `domain_reviewer.specialists` entries whose `trigger
 Use the array as `specialist_agents`. If it is empty, omit the field from the prompt
 (backward compatible — reviewer skips the specialist section entirely).
 
-Dispatch the `autviam-domain-reviewer` prompt profile as a Codex `explorer`:
+Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-b`, then dispatch the `autviam-domain-reviewer` prompt body through exactly the returned custom profile:
 
-```
-spawn_agent(agent_type="explorer", message="""
+```text
+spawn_agent(agent_type="<resolver.agent>", message="""
 Use `<skill_root>/agents/autviam-domain-reviewer.md` as your prompt profile.
 
 task_json_path: <tasks_folder>/json/<task_id>.json
@@ -148,7 +150,7 @@ On FAIL: record the failure entry (JSON block with `gate:"C"`, `result:"fail"`),
 
 On any gate retry, the implementer prompt is just:
 
-```
+```text
 Fix the issues found by Gate <X>:
 <paste agent's Issues list, ~3-10 lines>
 Re-read your modifications and the spec. Re-run task tests.

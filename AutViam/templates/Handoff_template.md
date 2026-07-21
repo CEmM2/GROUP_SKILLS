@@ -29,6 +29,16 @@
 
 ---
 
+## Routing Summary
+
+| Task ID | Purpose | Agent | Model | Effort | Capability | Parent | Depth | Policy | Enforcement |
+|---------|---------|-------|-------|--------|------------|--------|-------|--------|-------------|
+|         |         |       |       |        |            |        |       |        | hook / procedural / externally-overridden |
+
+**Routing evidence:** `<tasks_folder>/json/<task_id>.json#routing_evidence` and `<routing_ticket_path>`
+
+---
+
 ## Session Reset Packet
 
 > Use this after clearing the Codex/Claude session. It should be short enough to read first,

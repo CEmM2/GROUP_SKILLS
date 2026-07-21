@@ -44,6 +44,9 @@ Plan: `<plan_file>` · Branch: `<branch_name>`
 
 **Started:** <ISO> · **Completed:** <ISO or "in progress">
 **Failure counters:** A=<n> B=<n> C=<n>
+**Routing policy:** <policy_version> · **Task routing:** complexity=<n> risk=<n> combined=<n>
+**Parent:** <parent_role>:<parent_agent> · **Child:** <child_role>:<child_agent>
+**Depth:** <current>/<maximum> · **Capability:** <leaf|flat|nested> · **Enforcement:** <hook|procedural|externally-overridden>
 
 ### Gate A — Spec Compliance
 <one or more attempt blocks>

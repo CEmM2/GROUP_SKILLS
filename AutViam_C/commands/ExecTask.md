@@ -24,7 +24,9 @@ Open `<plan_file>` only at the task's `plan_lines` range — never in full.
 - Task `status` must not already be `"done"`. If it is, ask for confirmation before re-executing.
 - Task `status` must not be `"gate-cap-hit"` from a prior run unless the user is explicitly retrying with new instructions (in which case reset failure counters to 0).
 
-Compute complexity and risk (1–5 each). Apply SKILL.md § Codex Agent Assignment.
+Read the task's stored `complexity` and `risk`; do not recompute them. For a legacy task missing either value, assign both once using `references/codex-routing-scoring.md`, write them to the task JSON, and record `legacy_score_backfill: true`.
+
+Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, purpose, and UTC timestamp to that same file's `routing_evidence` using `references/codex-routing-scoring.md`. A resolver failure or unavailable returned profile is a fatal `blocked-by-precondition`; do not use a built-in or inline fallback.
 
 ## Step 2 — Branch setup
 
@@ -36,7 +38,7 @@ It checks out (or creates) `<plan_slug>_phase-<phase>`, **refuses on a dirty wor
 
 ## Step 3 — Implementer dispatch
 
-Dispatch a Codex `worker` using `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content. The calling agent owns integration, gate execution, and final commits after the worker returns.
+Run the resolver with `--task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose implementer`, and dispatch exactly its returned custom profile using `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content. The calling agent owns integration, gate execution, and final commits after the implementation agent returns.
 
 **Pre-dispatch skill check (deterministic):** same as ExecPhase Step 5 —
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json implementer.skills <base_sha> <head_sha>`
@@ -53,7 +55,7 @@ Initialize the gate file and task entry in `gates/phase_<phase>_gates.md`:
 Run A → B → C in sequence. The gates file is the source of truth for the per-gate failure count — after recording each FAIL block, run `gate_state.py cap-check <tasks_folder>/gates/phase_<phase>_gates.md <task_id> <gate>` (→ cap step on `CAP-HIT`) and `gate_state.py sync-counters <tasks_folder>/gates/phase_<phase>_gates.md <task_id>`. Never track failure counts in memory.
 
 ### Gate A — Spec Compliance
-Dispatch `autviam-spec-reviewer` as a Codex `explorer` prompt profile (see ExecPhase Step 6 for the prompt template). Parse verdict. If Codex agent dispatch is unavailable, run the profile inline and record `review_mode="inline"`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
+Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-a`, and dispatch the `autviam-spec-reviewer` prompt body through exactly its returned custom profile (see ExecPhase Step 6 for the prompt template). Parse the verdict. If dispatch is unavailable, stop with `blocked-by-precondition`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
 
 ### Gate B — Domain Quality
 Only after Gate A passes.
@@ -62,7 +64,7 @@ Only after Gate A passes.
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json domain_reviewer.specialists <base_sha> <head_sha>`
 prints the JSON array of matched specialists (or `[]`). Use it as `specialist_agents`; omit from the domain reviewer prompt when empty.
 
-Dispatch `autviam-domain-reviewer` as a Codex `explorer` prompt profile. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
+Run the resolver again with `--task-json <task-json> --role reviewer --evidence-file <same-task-json> --purpose gate-b`, and dispatch the `autviam-domain-reviewer` prompt body through exactly its returned custom profile. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
 Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims. On FAIL: record the JSON block (`gate:"C"`, `result:"fail"`), run `cap-check … C` + `sync-counters`. On PASS, the Gate C JSON block records `result:"pass"` + the `commit` SHA (read later by `last-good-sha` for rollback).

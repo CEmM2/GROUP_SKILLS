@@ -56,6 +56,8 @@ For each task, create `<tasks_folder>/json/<task_id>.json` from `templates/templ
 
 Field ownership: see SKILL.md § Task JSON Schema. Populate only the fields Plan-2-Tasks owns; leave the rest at template defaults.
 
+Assign `complexity` and `risk` once per task using `references/codex-routing-scoring.md`. Store each as an integer from 1 to 5. Add a one-sentence rationale for each score to the phase context summary. These values are immutable routing inputs: later commands and subagents read them but must not recompute them.
+
 For `plan_assets`: where the plan includes code, equations, diagrams, tables, or explicit constraints, record `{asset_type, plan_file, plan_lines, description}` entries. Downstream commands use `plan_lines` to read only the relevant slice of the plan instead of the whole file.
 
 ## Step 5 — Tracking file

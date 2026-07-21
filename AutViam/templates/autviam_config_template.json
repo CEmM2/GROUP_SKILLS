@@ -1,16 +1,32 @@
 {
-  "_comment": "Template — copy to autviam_config.json and fill values. Schema version 1.",
-  "schema_version": "1",
+  "_comment": "Template — copy to autviam_config.json and fill values. Schema version 2-claude-routing.",
+  "schema_version": "2-claude-routing",
   "installed_at": "YYYY-MM-DD",
   "repo": "owner/repo-or-local",
-  "_nested_dispatch_help": "off | on | auto — E2E execution mode. 'off' (default in Claude Code) runs each phase inline; 'on' uses the orchestrator subagent (needs an env that allows nested dispatch); 'auto' probes once and falls back to 'off'.",
-  "nested_dispatch": "off",
+  "routing_enforcement": "hook",
+  "allow_environment_overrides": false,
+  "_nested_dispatch_help": "Depth-governed recursive dispatch. Auto probes the runtime ceiling; on requires runtime_max_depth to be declared or detected.",
+  "nested_dispatch": {
+    "mode": "off",
+    "max_depth": 4,
+    "runtime_max_depth": null,
+    "phase_orchestrator": {
+      "spawn_implementers": true,
+      "spawn_reviewers": true
+    },
+    "domain_reviewer": {
+      "specialists": "nested"
+    },
+    "on_depth_exhausted": "caller"
+  },
   "_project_help": "'disable' (default) = no GitHub Project sync. Otherwise a board: \"Project Name\" (owner defaults to repo owner), or {\"owner\":\"X\",\"name\":\"...\"} / {\"owner\":\"X\",\"number\":N}.",
   "project": "disable",
   "domain_reviewer": {
     "specialists": [
       {
         "agent": "<agent-name-matching-.claude/agents/filename-stem>",
+        "routing_role": "explorer",
+        "prompt_file": ".claude/agents/<agent-name>.md",
         "description": "<one-line from agent frontmatter>",
         "trigger_patterns": [
           "^(apps|libs)/.*\\.py$"

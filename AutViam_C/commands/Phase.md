@@ -2,7 +2,7 @@
 
 Scaffold then execute one phase, **inline in the main thread** — AutViam_C's non-nested execution path.
 
-ScaffoldPhase and ExecPhase dispatch their Codex agents (the implementer via a `worker`, the Gate A/B reviewers via `explorer` profiles) one level down from whoever runs them. Run them inline in **main** and those are **single-level** `spawn_agent` dispatches — which work everywhere, including environments where the E2E orchestrator's *second* level of dispatch (an orchestrator worker that itself spawns implementer/reviewer agents) cannot nest.
+ScaffoldPhase and ExecPhase resolve and dispatch their custom Codex profiles (role `implementer` for implementation and `reviewer` for Gates A/B) one level down from whoever runs them. Run them inline in **main** and those are **single-level** `spawn_agent` dispatches. Every dispatch still follows SKILL.md § Codex Agent Assignment and records routing evidence; built-in profiles and inline review are prohibited.
 
 Use `phase` for "do this one phase now." For a full run, use `e2e` — it resolves the nested-dispatch mode in its Step 0 and, when nesting isn't available (the default), runs each phase via this same inline path automatically (see `E2E.md` § Nested-Dispatch capability).
 
@@ -22,7 +22,7 @@ If `<tasks_folder>/Phase_<phase_id>_Scaffold_Validation.md` is **absent**, run `
 
 ## Step 2 — Execute
 
-Run `commands/ExecPhase.md` for `<phase_id>` in the **same (main) thread**. Everything ExecPhase defines holds unchanged: the Codex agent assignment rule (SKILL.md § Codex Agent Assignment), the 3-failure-per-gate cap, Gate C verification, and Step 10 (handoff file + batched phase-issue/plan-overview GitHub updates, plus project sync if the board is armed). The implementer and the two reviewer profiles dispatch as single-level `spawn_agent` calls.
+Run `commands/ExecPhase.md` for `<phase_id>` in the **same (main) thread**. Everything ExecPhase defines holds unchanged: the Codex agent assignment rule (SKILL.md § Codex Agent Assignment), the 3-failure-per-gate cap, Gate C verification, and Step 10 (handoff file + batched phase-issue/plan-overview GitHub updates, plus project sync if the board is armed). The routed implementer and reviewer profiles dispatch as single-level `spawn_agent` calls.
 
 ## Step 3 — Report
 
@@ -30,4 +30,4 @@ Surface ExecPhase's phase summary (tasks done / capped / skipped) and the resume
 
 ---
 
-**Context note.** The inline path spends main-thread context (~30–60k tokens/phase) — the cost the E2E orchestrator avoids by absorbing per-task noise inside a worker. That trade is deliberate: correctness over leanness when nesting isn't available. If you're running many phases and nesting *is* available, prefer `e2e`.
+**Context note.** The inline path spends main-thread context (~30–60k tokens/phase) — the cost the E2E orchestrator avoids by absorbing per-task noise inside its delegated context. That trade is deliberate: correctness over leanness when nesting isn't available. If you're running many phases and nesting *is* available, prefer `e2e`.

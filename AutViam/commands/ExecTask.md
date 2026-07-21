@@ -24,7 +24,7 @@ Open `<plan_file>` only at the task's `plan_lines` range — never in full.
 - Task `status` must not already be `"done"`. If it is, ask for confirmation before re-executing.
 - Task `status` must not be `"gate-cap-hit"` from a prior run unless the user is explicitly retrying with new instructions (in which case reset failure counters to 0).
 
-Compute complexity and risk (1–5 each). Apply SKILL.md § Model Assignment.
+Read the complete immutable `routing`; do not recompute it. Missing routing may be populated only by an explicit one-time `resolve_claude_agent.py --initialize` call. Run the environment and exhaustive routing validators at top-level depth 0. Show the resolved implementer, Gate A, Gate B capability, explorer, parent, and depth evidence before dispatch.
 
 ## Step 2 — Branch setup
 
@@ -36,7 +36,7 @@ If not already on `<plan_slug>_phase-<phase>`:
 
 ## Step 3 — Implementer dispatch
 
-Use `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content.
+Invoke `resolve_claude_agent.py` with the task JSON, role `implementer`, purpose `implementer`, depth 1, and the same task evidence path. Dispatch exactly the returned generated agent with its ticket using `templates/task_instructions_template.md`. Pass paths and excerpts only; do not paste JSON or pass a model override.
 
 **Pre-dispatch skill check (deterministic):** same as ExecPhase Step 5 —
 → run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json implementer.skills <base_sha> <head_sha>`. Use the returned JSON array as `implementer_skills` (omit the `## Repo-configured skills` section from the prompt if empty).
@@ -52,15 +52,15 @@ Initialize the gate file and task entry (deterministic):
 Run A → B → C in sequence. Failure counts live in the gates file, not memory: after recording each FAIL attempt block, run `<skill_root>/scripts/gate_state.py cap-check <gates_file> <task_id> <gate>` (prints `OK n` or `CAP-HIT n` on the 4th same-gate fail) and `<skill_root>/scripts/gate_state.py sync-counters <gates_file> <task_id>` to refresh the counters line. (`<gates_file>` = `<tasks_folder>/gates/phase_<phase>_gates.md`.)
 
 ### Gate A — Spec Compliance
-Dispatch `autviam-spec-reviewer` (see ExecPhase Step 6 for the prompt template). Parse verdict. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … A` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block below, else loop.
+Resolve `spec_reviewer` with purpose `gate-a` from the same task routing for every attempt and dispatch exactly its generated leaf profile and ticket (see ExecPhase Step 6). Parse verdict. No fallback. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … A` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block below, else loop.
 
 ### Gate B — Domain Quality
 Only after Gate A passes.
 
 **Pre-dispatch specialist check (deterministic):** same as ExecPhase Gate B —
-→ run `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_config.json domain_reviewer.specialists <base_sha> <head_sha>`. Use the returned JSON array as `specialist_agents` (omit from the prompt if empty).
+Apply the exact topology branch from ExecPhase. This command runs in the main session, so `caller` resolves and dispatches matched explorer lenses and passes their actual `specialist_reports`; `nested` passes `specialist_agents` to nested Gate B; `off` skips matching and passes neither field.
 
-Dispatch `autviam-domain-reviewer`. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … B` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block, else re-run **Gate A then Gate B**.
+Resolve `domain_reviewer` with purpose `gate-b` and capability `auto`. Use nested or flat specialist handling exactly as ExecPhase specifies, including `skill_root` in the Gate B prompt so nested reviewers can resolve explorer children; dispatch the generated profile and ticket, and record parent/child/depth evidence. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … B` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block, else re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
 Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims. On FAIL: **you author** the prose+JSON attempt block, then `cap-check … C` (+ `sync-counters`); on `CAP-HIT` go to the cap-hit block.
