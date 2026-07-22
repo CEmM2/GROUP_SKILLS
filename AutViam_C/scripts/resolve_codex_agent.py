@@ -310,6 +310,20 @@ def validate_dispatcher_capabilities(capabilities: Mapping[str, Any]) -> dict[st
                 ),
             }
         )
+        # `available` states only that a launcher is configured and advertises the
+        # required controls. Whether this environment permits the launch is a separate,
+        # measured fact written by probe_codex_dispatch.py. Absent means unprobed, and
+        # unprobed is not executable — a launcher trusted on the strength of `--help`
+        # is exactly what blocked Gate B after the read-only roles stopped degrading.
+        runtime_executable = external.get("runtime_executable")
+        if runtime_executable is not None and not isinstance(runtime_executable, bool):
+            raise RoutingError(
+                "dispatcher capabilities.external_dispatch.runtime_executable must be boolean"
+            )
+        normalized_external["runtime_executable"] = bool(runtime_executable)
+        normalized_external["last_probe_result"] = (
+            external.get("last_probe_result") if runtime_executable is not None else "unprobed"
+        )
     normalized["external_dispatch"] = normalized_external
     return normalized
 
@@ -447,6 +461,8 @@ def validate_prompt_projection(prompt_path: Path, profile: Mapping[str, Any]) ->
 def _external_exact_supported(external: Mapping[str, Any], model: str) -> bool:
     return bool(
         external.get("available")
+        # Measured by probe_codex_dispatch.py, not inferred from the launcher's --help.
+        and external.get("runtime_executable")
         and external.get("supports_model_selection")
         and external.get("supports_reasoning_effort")
         and external.get("supports_sandbox_override")
@@ -599,13 +615,25 @@ def build_dispatch_specification(
             "uncontrolled_fields": [],
         }
     else:
+        # Name the specific reason: "launcher configured but never probed" and "launcher
+        # refused by this environment" have different remedies, and an operator reading
+        # a blocked gate should not have to guess which one they are looking at.
+        if external.get("available") and not external.get("runtime_executable"):
+            probe_result = external.get("last_probe_result") or "unprobed"
+            reason = (
+                "the configured external launcher is not executable in this environment "
+                f"(last probe: {probe_result}); run scripts/probe_codex_dispatch.py to "
+                "re-probe, or grant the session permission to launch it"
+            )
+        else:
+            reason = "neither the native dispatcher nor the configured external launcher satisfies the role policy"
         dispatch = {
             "mode": "unavailable",
             "routing_enforcement": "none",
             "required": required,
             "controlled_fields": [],
             "uncontrolled_fields": uncontrolled_fields,
-            "reason": "neither the native dispatcher nor the configured external launcher satisfies the role policy",
+            "reason": reason,
         }
 
     return {

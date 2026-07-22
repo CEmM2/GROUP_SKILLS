@@ -40,6 +40,57 @@ rm -rf <path>/.<file>.routing-lock
 Removing the lock never discards evidence — evidence writes are atomic, so the task JSON
 is either the pre-write or the post-write version, never a partial one.
 
+## Routing blocked as `unavailable`
+
+`resolve_codex_agent.py` returns `recommended_mode: "unavailable"` when no dispatch mode
+satisfies the role's policy. This is fail-closed by design — never substitute a profile,
+model, effort, prompt, or launcher to get past it. Read `dispatch.reason`, which names
+which of the two causes you have.
+
+**Cause 1 — the external launcher is not executable here.** The reason reads `the
+configured external launcher is not executable in this environment (last probe: …)`.
+`external_dispatch.available` only records that a launcher is configured and advertises
+the controls the policy needs; whether *this* session may launch it is measured
+separately by `probe_codex_dispatch.py` and stored as `runtime_executable`. An unprobed
+record counts as not executable.
+
+```bash
+python <skill_root>/scripts/probe_codex_dispatch.py --check    # is the record usable here?
+python <skill_root>/scripts/probe_codex_dispatch.py --json     # re-probe and record
+```
+
+`last_probe_result` distinguishes the failure modes, which have different fixes:
+
+| `last_probe_result` | Meaning | Fix |
+|---|---|---|
+| `unprobed` | never launched; the record predates the probe | run the probe |
+| `permission-denied` | the environment refused the launch | see below |
+| `no-output` | launcher exited 0 but printed nothing | check the launcher's model/auth configuration — it ran but produced no result |
+| `timeout` | launcher did not finish in time | raise `--timeout-seconds`, or investigate why the launch hangs |
+| `launcher-missing` | not on `PATH` | install it, or correct `external_dispatch.command` |
+
+On `permission-denied`, the usual cause is the **calling session's own sandbox**: a Codex
+session started under a restrictive `-s` mode cannot spawn a nested `codex exec` at all,
+because the parent sandbox blocks the exec before any child sandbox is negotiated. This
+cannot be fixed from inside the session — approving the command interactively does not
+help, because the refusal happens below the approval layer. Restart Codex with a sandbox
+that permits spawning the launcher, and confirm `[agents] max_depth` is at least 2 (Codex
+defaults to 1). Only then re-probe.
+
+If `--check` reports *probed in a different environment*, the record was written by a
+session with a different launcher or `CODEX_*` configuration. Re-probe; do not hand-edit
+the fingerprint.
+
+**Cause 2 — no mode satisfies the role.** Any other reason text means the native
+dispatcher lacks a control the role requires and no exact launcher is configured at all.
+On a dispatcher exposing neither per-child reasoning effort nor a sandbox override, every
+role routes externally, so a missing or denied launcher blocks the whole pipeline rather
+than only the gates. Read-only roles (`spec_reviewer`, `domain_reviewer`, `explorer`,
+`mechanical_read_only`) can never fall back to native dispatch: without a sandbox
+override they would inherit the caller's `workspace-write` access, which is a containment
+failure, not a quality degradation. Fix the dispatcher or the launcher; do not relax
+`dispatch_policy`.
+
 ## Gate-cap stop options the user may pick
 
 When ExecPhase/ExecTask halts on a 4th-failure-on-same-gate, present these options:

@@ -73,7 +73,47 @@ Shape:
 
 The values above illustrate the schema only. Derive the installed file from the live interfaces. If no exact external launcher exists, set `external_dispatch.available` to `false` and omit its other fields.
 
+Do not write `runtime_executable`, `last_probe_result`, `last_probe_at`, `environment_fingerprint`, or `failure_detail` by hand. Those are measured, not asserted — Step 0b-2 writes them.
+
 For `--dry-run`, report the probed values and intended runtime path without writing it.
+
+### Step 0b-2 — Measure whether the launcher actually runs here
+
+`external_dispatch.available` records that a launcher is configured and that its `--help`
+advertises the required controls. It does not record that this environment permits the
+launch: a nested `codex exec` is routinely refused by sandbox policy, by an approval
+layer, or by `[agents] max_depth`. Since read-only roles no longer degrade to a native
+model-and-prompt dispatch, an unverified launcher blocks Gate A, Gate B, explore, and the
+mechanical read-only route at the moment they are needed rather than at install.
+
+Run the probe, which launches the launcher once, bounded and read-only, and records the
+outcome:
+
+```bash
+python <skill_root>/scripts/probe_codex_dispatch.py \
+  --dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json \
+  --json
+```
+
+Exit 0 means the launcher ran here and `runtime_executable` is now `true`. A nonzero exit
+records why it did not (`permission-denied`, `no-output`, `timeout`, `launcher-missing`)
+and leaves `runtime_executable` `false`, which makes every exact route resolve to
+`unavailable`. That is the correct outcome — report it to the user with the recorded
+`failure_detail` and the remedy from `references/recovery.md` § Routing blocked as
+`unavailable`. Do not work around it by editing the capability record.
+
+An `mcp` launcher cannot be probed as a subprocess. Verify it through the host's tool
+layer, then record the verified outcome explicitly:
+
+```bash
+python <skill_root>/scripts/probe_codex_dispatch.py --record-manual executable
+```
+
+The probe stamps an `environment_fingerprint` covering the launcher identity and the
+`CODEX_*` environment. A later session with different permissions will fail
+`--check`, because a record probed at install time does not describe it.
+
+For `--dry-run`, report the probe result without writing it.
 
 ### Step 0c — Validate the executable routing matrix
 
@@ -90,11 +130,19 @@ Any nonzero result is fatal. The validator proves that all 150 score/role routes
 
 After installation, perform bounded live smoke checks for each mode that the matrix selected:
 
-1. Resolve one permissive read-only route and execute its `recommended_mode`; require `PASS`.
+1. Resolve one permissive read-only route and execute its `recommended_mode`; require `PASS`. Step 0b-2 already proved the launcher runs, so this checks the route, not the launcher.
 2. Resolve representative Terra and Sol routes and confirm the dispatched base model and canonical prompt.
 3. Resolve Gate B and confirm it uses `native_exact` or `external_exact`; never accept model-only degradation for an exact gate.
 
 If a selected mode or model is unavailable, routing is blocked in that runtime. Do not substitute a profile, model, effort, prompt, or launcher, and do not claim runtime verification from static files alone.
+
+A capability record is session-bound. Before a run that did not just install, confirm the recorded probe still describes the current session:
+
+```bash
+python <skill_root>/scripts/probe_codex_dispatch.py --check
+```
+
+A nonzero exit means re-probe before dispatching; see `references/recovery.md` § Routing blocked as `unavailable`.
 
 ## Step 1 — Scan (deterministic)
 
