@@ -1,80 +1,64 @@
 #!/usr/bin/env python3
-"""Shared deterministic helpers for AutViam Claude routing scripts."""
+"""Claude-specific routing helpers for AutViam, plus the shared-core re-exports.
+
+The generic primitives (JSON load, atomic write, locking, score validation, hashing)
+live in `routing_core.py`, which is single-sourced from `skills/shared/scripts/` and
+shared with AutViam_C. They are re-exported here so every existing
+`from claude_routing_common import ...` keeps working unchanged.
+
+`RoutingCommonError` is an *alias* for `RoutingCoreError`, not a subclass — the two names
+bind the same class, so core-raised errors still match every `except RoutingCommonError`
+site in this skill.
+"""
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import hmac
 import json
-import os
-import tempfile
-import time
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Mapping
+
+from routing_core import (
+    LOCK_STALE_AFTER_SECONDS,
+    RoutingCoreError as RoutingCommonError,
+    atomic_write_json,
+    atomic_write_text,
+    directory_lock as _core_directory_lock,
+    load_json,
+    sha256_text,
+    validate_score,
+)
+
+__all__ = [
+    # Re-exported from routing_core (canonical: skills/shared/scripts/routing_core.py).
+    "LOCK_STALE_AFTER_SECONDS",
+    "RoutingCommonError",
+    "atomic_write_json",
+    "atomic_write_text",
+    "directory_lock",
+    "load_json",
+    "sha256_text",
+    "validate_score",
+    # Claude-specific.
+    "default_nested_dispatch",
+    "load_ticket_key",
+    "normalize_config",
+    "parse_frontmatter",
+    "parse_frontmatter_text",
+    "ticket_signature",
+]
 
 
-class RoutingCommonError(RuntimeError):
-    pass
-
-
-def load_json(path: Path, label: str) -> dict[str, Any]:
-    if not path.is_file():
-        raise RoutingCommonError(f"{label} does not exist: {path}")
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RoutingCommonError(f"could not read {label} {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise RoutingCommonError(f"{label} must contain a JSON object: {path}")
-    return value
-
-
-def atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except Exception:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
-
-
-def atomic_write_json(path: Path, value: Mapping[str, Any]) -> None:
-    atomic_write_text(path, json.dumps(value, indent=2, ensure_ascii=False) + "\n")
-
-
-@contextlib.contextmanager
-def directory_lock(path: Path, timeout_seconds: float = 30.0) -> Iterator[None]:
-    lock_path = path.with_name(f".{path.name}.autviam-lock")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        try:
-            lock_path.mkdir()
-            break
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise RoutingCommonError(f"timed out acquiring lock: {lock_path}")
-            time.sleep(0.02)
-    try:
-        yield
-    finally:
-        try:
-            lock_path.rmdir()
-        except FileNotFoundError:
-            pass
-
-
-def sha256_text(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+def directory_lock(path: Path, timeout_seconds: float = 30.0, stale_after_seconds: float = LOCK_STALE_AFTER_SECONDS):
+    """AutViam's lock — pins the `.autviam-lock` suffix quoted by references/recovery.md."""
+    return _core_directory_lock(
+        path,
+        timeout_seconds=timeout_seconds,
+        stale_after_seconds=stale_after_seconds,
+        suffix="autviam-lock",
+        label="lock",
+    )
 
 
 def ticket_signature(ticket: Mapping[str, Any], key: bytes) -> str:

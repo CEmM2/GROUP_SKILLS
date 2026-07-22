@@ -4,16 +4,25 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import datetime as dt
 import json
-import os
 import subprocess
 import sys
-import tempfile
-import time
 from pathlib import Path
 from typing import Any, Mapping
+
+# `RoutingError` is an *alias* for `RoutingCoreError`, not a subclass: the two names bind
+# the same class, so errors raised inside routing_core still match the `except
+# RoutingError` sites here and in validate_codex_agent_routing.py. Subclassing would let
+# core errors escape those handlers and turn clean `exit 2` failures into tracebacks.
+from routing_core import (
+    LOCK_STALE_AFTER_SECONDS,
+    RoutingCoreError as RoutingError,
+    atomic_write_json,
+    directory_lock,
+    load_json,
+    validate_score,
+)
 
 try:
     import tomllib
@@ -65,10 +74,6 @@ ROLE_PROMPT_FILES = {
 }
 
 
-class RoutingError(RuntimeError):
-    """Raised when routing cannot be completed without a silent fallback."""
-
-
 def skill_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -101,24 +106,6 @@ def default_agents_dir() -> Path:
     except (FileNotFoundError, subprocess.CalledProcessError):
         pass
     return Path.cwd() / ".codex" / "agents"
-
-
-def load_json(path: Path, label: str) -> dict[str, Any]:
-    if not path.is_file():
-        raise RoutingError(f"{label} does not exist: {path}")
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RoutingError(f"could not read {label} {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise RoutingError(f"{label} must contain a JSON object: {path}")
-    return value
-
-
-def validate_score(name: str, value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
-        raise RoutingError(f"{name} must be an integer from 1 to 5; found {value!r}")
-    return value
 
 
 def validate_policy(policy: Mapping[str, Any]) -> None:
@@ -175,6 +162,7 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
     for role, requirement in dispatch_policy.items():
         if not isinstance(requirement, dict) or set(requirement) != {
             "allow_uncontrolled_effort",
+            "allow_uncontrolled_sandbox",
             "minimum_enforcement",
         }:
             raise RoutingError(
@@ -184,9 +172,13 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
             raise RoutingError(
                 f"dispatch_policy[{role!r}] has invalid minimum_enforcement"
             )
-        if not isinstance(requirement["allow_uncontrolled_effort"], bool):
+        for flag in ("allow_uncontrolled_effort", "allow_uncontrolled_sandbox"):
+            if not isinstance(requirement[flag], bool):
+                raise RoutingError(f"dispatch_policy[{role!r}] {flag} must be boolean")
+        if role in READ_ONLY_ROLES and requirement["allow_uncontrolled_sandbox"]:
             raise RoutingError(
-                f"dispatch_policy[{role!r}] allow_uncontrolled_effort must be boolean"
+                f"read-only role {role!r} must not set allow_uncontrolled_sandbox; an "
+                "uncontrolled sandbox lets it inherit the caller's write access"
             )
 
     special = policy.get("special_routes", {}).get("mechanical_read_only")
@@ -487,6 +479,7 @@ def build_dispatch_specification(
 
     minimum = requirement["minimum_enforcement"]
     allow_uncontrolled_effort = requirement["allow_uncontrolled_effort"]
+    allow_uncontrolled_sandbox = requirement["allow_uncontrolled_sandbox"]
     if minimum == "exact":
         if native_exact_supported:
             mode = "native_exact"
@@ -494,8 +487,10 @@ def build_dispatch_specification(
             mode = "external_exact"
         else:
             mode = "unavailable"
-    elif native_model_supported and (
-        native_effort_supported or allow_uncontrolled_effort
+    elif (
+        native_model_supported
+        and (native_effort_supported or allow_uncontrolled_effort)
+        and (native_sandbox_supported or allow_uncontrolled_sandbox)
     ):
         mode = "native_exact" if native_exact_supported else "native_model_prompt"
     elif external_exact_supported:
@@ -680,7 +675,9 @@ def resolve_route(
         profile,
     )
     execution = build_dispatch_specification(
-        requirement=policy["dispatch_policy"][role],
+        # Keyed on effective_role: a mechanical_read_only task above the Luna bound
+        # runs on the explorer profile and must obey the explorer's dispatch policy.
+        requirement=policy["dispatch_policy"][effective_role],
         capabilities=capabilities,
         model=profile["model"],
         reasoning_effort=profile["model_reasoning_effort"],
@@ -736,28 +733,20 @@ def scores_from_task_json(task_path: Path) -> tuple[int, int, str]:
     return complexity, risk, task_id
 
 
-@contextlib.contextmanager
-def evidence_lock(path: Path, timeout_seconds: float = 30.0):
-    """Serialize evidence updates with an atomic lock-directory acquisition."""
-    lock_path = path.with_name(f".{path.name}.routing-lock")
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        try:
-            lock_path.mkdir()
-            break
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise RoutingError(
-                    f"timed out acquiring routing evidence lock: {lock_path}"
-                )
-            time.sleep(0.02)
-    try:
-        yield
-    finally:
-        try:
-            lock_path.rmdir()
-        except FileNotFoundError:
-            pass
+def evidence_lock(
+    path: Path,
+    timeout_seconds: float = 30.0,
+    stale_after_seconds: float = LOCK_STALE_AFTER_SECONDS,
+):
+    """AutViam_C's lock — pins the `.routing-lock` suffix and message text that
+    references/recovery.md quotes."""
+    return directory_lock(
+        path,
+        timeout_seconds=timeout_seconds,
+        stale_after_seconds=stale_after_seconds,
+        suffix="routing-lock",
+        label="routing evidence lock",
+    )
 
 
 def write_routing_evidence(path: Path, purpose: str, result: Mapping[str, Any]) -> None:
@@ -801,22 +790,7 @@ def write_routing_evidence(path: Path, purpose: str, result: Mapping[str, Any]) 
                 "resolver": dict(result),
             }
         )
-        fd, temporary = tempfile.mkstemp(
-            prefix=f".{path.name}.", dir=str(path.parent), text=True
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                json.dump(document, handle, indent=2, ensure_ascii=False)
-                handle.write("\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, path)
-        except Exception:
-            try:
-                os.unlink(temporary)
-            except FileNotFoundError:
-                pass
-            raise
+        atomic_write_json(path, document)
 
 
 def validate_purpose_role(purpose: str, role: str) -> None:

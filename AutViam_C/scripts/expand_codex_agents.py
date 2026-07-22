@@ -9,7 +9,8 @@ import sys
 MESSAGE = (
     "expand_codex_agents.py is deprecated for Path 2 because template-derived profiles "
     "cannot satisfy exact managed-source validation. Use install_agent_profiles.py to "
-    "generate the canonical managed profiles."
+    "generate the canonical managed profiles. This shim is scheduled for removal after "
+    "2026-10-01."
 )
 
 

@@ -74,27 +74,33 @@
   "dispatch_policy": {
     "implementer": {
       "minimum_enforcement": "model_and_prompt",
-      "allow_uncontrolled_effort": false
+      "allow_uncontrolled_effort": false,
+      "allow_uncontrolled_sandbox": true
     },
     "orchestrator": {
       "minimum_enforcement": "model_and_prompt",
-      "allow_uncontrolled_effort": false
+      "allow_uncontrolled_effort": false,
+      "allow_uncontrolled_sandbox": true
     },
     "spec_reviewer": {
       "minimum_enforcement": "exact",
-      "allow_uncontrolled_effort": false
+      "allow_uncontrolled_effort": false,
+      "allow_uncontrolled_sandbox": false
     },
     "domain_reviewer": {
       "minimum_enforcement": "exact",
-      "allow_uncontrolled_effort": false
+      "allow_uncontrolled_effort": false,
+      "allow_uncontrolled_sandbox": false
     },
     "explorer": {
       "minimum_enforcement": "model_and_prompt",
-      "allow_uncontrolled_effort": true
+      "allow_uncontrolled_effort": true,
+      "allow_uncontrolled_sandbox": false
     },
     "mechanical_read_only": {
       "minimum_enforcement": "model_and_prompt",
-      "allow_uncontrolled_effort": true
+      "allow_uncontrolled_effort": true,
+      "allow_uncontrolled_sandbox": false
     }
   },
   "special_routes": {

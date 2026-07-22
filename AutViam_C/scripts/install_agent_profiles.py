@@ -25,14 +25,14 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+
+from routing_core import atomic_write_text as atomic_write
 
 try:
     import tomllib
@@ -297,23 +297,6 @@ def is_managed(path: Path) -> bool:
             return MANAGED_MARKER in "".join(handle.readline() for _ in range(4))
     except OSError:
         return False
-
-
-def atomic_write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except Exception:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
 
 
 def install_profiles(output_dir: Path, generated: Mapping[str, str], args: argparse.Namespace) -> tuple[list[dict[str, str]], bool]:

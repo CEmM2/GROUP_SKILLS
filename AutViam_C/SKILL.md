@@ -86,6 +86,8 @@ The routing JSON selects execution requirements plus an audit profile projection
 
 A review dispatch is valid only when it uses the resolver-selected base model, every supported required control, the exact canonical role prompt, and all task inputs. Validity never depends on a native dispatcher accepting a generated TOML filename.
 
+**Sandbox containment is never degradable for a read-only role.** `dispatch_policy` states per role which controls may go uncontrolled when the dispatcher cannot enforce them: `allow_uncontrolled_effort` trades reasoning quality, `allow_uncontrolled_sandbox` trades containment. The four read-only roles (`spec_reviewer`, `domain_reviewer`, `explorer`, `mechanical_read_only`) set the latter to `false` and the resolver rejects any policy that says otherwise — an uncontrolled sandbox would let them inherit the caller's `workspace-write` access, silently turning a read-only reviewer into a writer. On a dispatcher without sandbox override they route to the exact external launcher, or block as `unavailable`; they never dispatch natively. `implementer` and `orchestrator` already pin `workspace-write`, so inheriting the caller's sandbox is not an escalation and they stay dispatchable.
+
 For retries and repeated gates, invoke the resolver again from the same stored scores and record a new evidence entry. Both ExecPhase and ExecTask reference this rule by name; do not duplicate or alter the policy inline.
 
 For workflows that need a standalone immutable routing record, copy `templates/task-routing-manifest.json`, fill it from the stored task scores and active policy version, then invoke the resolver with `--manifest <path>`. The resolver rejects combined-score or policy-version drift.
@@ -138,7 +140,7 @@ The markdown tracker is the source of truth. GitHub issues are a projection.
 Six canonical Markdown prompt sources provide the durable role bodies used by the runtime profile installer:
 
 | Prompt profile | Runtime role | Role | Invoked from |
-|---|---|---|
+|---|---|---|---|
 | `autviam-implementer` | `implementer` | Implementation behavior | ScaffoldPhase, ExecPhase, ExecTask, orchestrator |
 | `autviam-spec-reviewer` | `spec_reviewer` | Gate A (spec compliance) | ExecPhase, ExecTask, orchestrator |
 | `autviam-domain-reviewer` | `domain_reviewer` | Gate B (domain quality) | ExecPhase, ExecTask, orchestrator |
@@ -154,11 +156,12 @@ The implementer's durable behavior comes from `agents/autviam-implementer.md`; `
 
 ### Bundled scripts
 
-Thirteen helper scripts live at `<skill_root>/scripts/` (reference them as `<skill_root>/scripts/<name>`). The LLM keeps the judgment work (objectives, scoring, gate verdicts, prose attempt blocks, Decision narrative) around deterministic plumbing.
+Fourteen helper scripts live at `<skill_root>/scripts/` (reference them as `<skill_root>/scripts/<name>`). The LLM keeps the judgment work (objectives, scoring, gate verdicts, prose attempt blocks, Decision narrative) around deterministic plumbing.
 
 | Script | Owns |
 |---|---|
-| `expand_codex_agents.py` | Deprecated compatibility entry point; always exits nonzero and directs callers to canonical `install_agent_profiles.py`, because template-derived profiles cannot pass exact managed-source validation. |
+| `routing_core.py` | **Generated — canonical source is `skills/shared/scripts/routing_core.py`, shared with AutViam.** Atomic JSON/text writes, the stale-breaking directory lock (`evidence_lock` wraps it), score validation, and hashing. Never hand-edit the per-skill copy. |
+| `expand_codex_agents.py` | Deprecated compatibility entry point; always exits nonzero and directs callers to canonical `install_agent_profiles.py`, because template-derived profiles cannot pass exact managed-source validation. Scheduled for removal after 2026-10-01. |
 | `install_agent_profiles.py` | Idempotently generates nineteen external-launch/audit TOML projections from six canonical role sources in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and Codex serialization. |
 | `resolve_codex_agent.py` | Fail-closed resolver: validates stored scores, capability probe, policy, role, prompt, profile projection, reviewer floor, and Luna boundary; emits an executable native/external dispatch specification and evidence. |
 | `validate_codex_agent_routing.py` | Exhaustively validates all 150 score-role combinations, policy and capability shape, exact canonical-source rendering, executable dispatch availability, controlled-vs-uncontrolled fields, reviewer floor, and Luna boundary. |

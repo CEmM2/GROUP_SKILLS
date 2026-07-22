@@ -133,10 +133,15 @@
     "dispatch_requirement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["minimum_enforcement", "allow_uncontrolled_effort"],
+      "required": [
+        "minimum_enforcement",
+        "allow_uncontrolled_effort",
+        "allow_uncontrolled_sandbox"
+      ],
       "properties": {
         "minimum_enforcement": { "enum": ["exact", "model_and_prompt"] },
-        "allow_uncontrolled_effort": { "type": "boolean" }
+        "allow_uncontrolled_effort": { "type": "boolean" },
+        "allow_uncontrolled_sandbox": { "type": "boolean" }
       }
     }
   }

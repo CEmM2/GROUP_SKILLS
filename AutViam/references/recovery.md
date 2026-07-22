@@ -19,6 +19,26 @@ If the phase branch is unrecoverable:
 3. Re-execute only the incomplete tasks on the fresh branch — the gate history and JSONs tell you which to re-run.
 4. Keep the old branch around until the new one passes Gate C across the phase; then delete the old branch.
 
+## Stuck routing lock
+
+`resolve_claude_agent.py` serializes routing-evidence writes with a lock directory
+(`.<file>.autviam-lock`) beside the target file. A resolver killed mid-write leaves it
+behind.
+
+Locks older than 300s are broken automatically on the next acquisition, so this normally
+self-heals. If a dispatch still fails with `timed out acquiring lock`, either a live
+resolver is genuinely writing (wait), or the lock was abandoned less than 300s ago —
+inspect `owner.json` inside the lock directory for the holding PID, confirm that process
+is gone, then remove the directory:
+
+```bash
+cat <path>/.<file>.autviam-lock/owner.json   # {"pid": …, "acquired_at": …}
+rm -rf <path>/.<file>.autviam-lock
+```
+
+Removing the lock never discards evidence — evidence writes are atomic, so the target
+file is either the pre-write or the post-write version, never a partial one.
+
 ## Gate-cap stop options the user may pick
 
 When ExecPhase/ExecTask halts on a 4th-failure-on-same-gate, present these options:

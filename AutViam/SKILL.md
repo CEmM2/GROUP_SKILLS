@@ -40,7 +40,7 @@ Templates live in `templates/`. Review agents live in `agents/` (see § Reviewer
 
 ### Bundled scripts
 
-Seventeen helper scripts live at `<skill_root>/scripts/`. Existing plan/GitHub scripts retain their responsibilities; the routing scripts deterministically generate Claude agents, resolve immutable task routing, issue and validate depth-aware tickets, audit subagent starts, check environment overrides, and record live depth probes.
+Eighteen helper scripts live at `<skill_root>/scripts/`. Existing plan/GitHub scripts retain their responsibilities; the routing scripts deterministically generate Claude agents, resolve immutable task routing, issue and validate depth-aware tickets, audit subagent starts, check environment overrides, and record live depth probes.
 
 | Script | Owns |
 |---|---|
@@ -51,7 +51,8 @@ Seventeen helper scripts live at `<skill_root>/scripts/`. Existing plan/GitHub s
 | `check_claude_routing_environment.py` | Blocks `CLAUDE_CODE_SUBAGENT_MODEL` / `CLAUDE_CODE_EFFORT_LEVEL` in strict mode or labels evidence externally overridden in permissive mode. |
 | `probe_nested_dispatch.py` | Prepares and validates evidence from a bounded no-write recursive Agent probe, then records the verified maximum depth and resolves auto mode. |
 | `audit_subagent_start.py` | Audit-only `SubagentStart` logger for generated AutViam agent identity and runtime-reported depth. |
-| `claude_routing_common.py` | Shared atomic I/O, locks, frontmatter parsing, hashing, and legacy-config normalization. |
+| `routing_core.py` | **Generated — canonical source is `skills/shared/scripts/routing_core.py`, shared with AutViam_C.** Atomic JSON/text writes, the stale-breaking directory lock, score validation, and hashing. Never hand-edit the per-skill copy. |
+| `claude_routing_common.py` | Claude-specific helpers — ticket signing, frontmatter parsing, legacy-config normalization — plus re-exports of `routing_core` so existing imports are unchanged. |
 | `init_plan.sh` | Plan-2-Tasks Step 7 plumbing: `slug`, `dirs` (json/gates/reviews), `labels` (diff-only create), `create-issue` (prints #), `map`, `annotate`. |
 | `issue_body.sh` | The canonical issue-body roundtrip `gh` halves: `fetch`, `push` (body + label swap + close/state flags), `label` (label-only). LLM does the Edit/MultiEdit between fetch and push. |
 | `gate_state.py` | Gate-file + task-JSON state: `init`/`init-task`, `count`/`cap-check`/`sync-counters` (the 3-failure cap, durable from the file), `complete`/`set-status`/`reset-task`, `last-good-sha`, `reset-packet`. |
