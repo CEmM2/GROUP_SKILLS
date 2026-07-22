@@ -2,13 +2,13 @@
 name: AutViam_C
 description: >
   Codex-native phased plan execution with test scaffolding, quality gates,
-  deterministic custom-agent routing, a hard failure cap, and phase-level
+  capability-aware model and prompt routing, a hard failure cap, and phase-level
   GitHub tracking. Use for AutViam_C or its phase commands.
 ---
 
 # AutViam_C — Codex Plan → Scaffold → Execute
 
-Self-contained pipeline turning a markdown plan into tracked, executed, verified work. This is the Codex-native fork of AutViam: it preserves the phase-only GitHub issue model and gate discipline while routing every subagent through an explicit, installed Codex profile. Bundled Markdown prompt profiles supply role instructions; the routed TOML profile pins the model, reasoning effort, and sandbox.
+Self-contained pipeline turning a markdown plan into tracked, executed, verified work. This is the Codex-native fork of AutViam: it preserves the phase-only GitHub issue model and gate discipline while routing every subagent through a capability-aware execution specification. Bundled Markdown files are canonical role prompts. Generated TOMLs are external-launch profiles and audit projections; their names are native subagent types only when the active dispatcher probe explicitly says so.
 
 ## Routing
 
@@ -72,13 +72,19 @@ Before every Codex subagent dispatch:
 
 1. For a task dispatch, identify its task JSON path; the resolver must read `task_id`, `complexity`, and `risk` directly from that file. For a phase orchestrator, use the maximum stored complexity and maximum stored risk across that phase's tasks.
 2. Select one role: `implementer`, `orchestrator`, `spec_reviewer`, `domain_reviewer`, `explorer`, or `mechanical_read_only`.
-3. For every task dispatch, invoke `<skill_root>/scripts/resolve_codex_agent.py --task-json <task-json> --role <role> --evidence-file <same-task-json> --purpose <purpose>`. Raw `--complexity/--risk` inputs are reserved for phase aggregation and diagnostics; they cannot write evidence into a task JSON.
-4. Parse the JSON output and dispatch exactly the custom profile in `agent`.
+3. For every task dispatch, invoke `<skill_root>/scripts/resolve_codex_agent.py --dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json --task-json <task-json> --role <role> --evidence-file <same-task-json> --purpose <purpose>`. Raw `--complexity/--risk` inputs are reserved for phase aggregation and diagnostics; they cannot write evidence into a task JSON.
+4. Parse the JSON output and dispatch using `recommended_mode` and `dispatch`:
+   - `native_exact`: call the native dispatcher with `dispatch.model`, `dispatch.reasoning_effort`, and, only when its schema supports it, `dispatch.sandbox_mode`; load `dispatch.prompt_file` as the exact role contract and append task-specific inputs.
+   - `native_model_prompt`: call the native dispatcher with `dispatch.model` and the exact role prompt. Pass effort or sandbox only when those keys are present. Preserve the returned degradation fields in evidence.
+   - `external_exact`: invoke `dispatch.launcher` with the returned model, reasoning effort, sandbox, exact prompt file, and task inputs.
+   - `unavailable`: block before implementation or a gate; do not fabricate a result.
 5. Confirm the resolver atomically appended its complete output, dispatch purpose, and timestamp to the task JSON or phase routing-evidence file.
-6. Do not dispatch built-in `worker`, `explorer`, or `default` profiles. Do not substitute another model, reasoning effort, or profile. Do not inherit either setting from the parent session.
-7. Treat any resolver, profile-validation, or dispatch-availability failure as fatal. Never fall back silently.
+6. Never pass `profile_projection.name` as `agent_type` unless the capability record explicitly confirms custom-profile support. The normal native contract is supported base model + exact canonical role prompt + task inputs.
+7. Do not substitute another model, effort, prompt, or execution mode. Treat resolver, validation, launcher, and dispatch-availability failures as fatal. Never fall back silently.
 
-The routing JSON selects a profile. Canonical Markdown in `agents/` is the sole source of truth for durable role behavior. The installer serializes that behavior into `.codex/agents/*.toml`, where the generated profile owns model, reasoning effort, sandbox, platform tool availability, and Codex-specific representation. The bounded `mechanical_read_only` route uses Luna only for `complexity <= 2` and `risk <= 2`; larger mechanical read-only tasks route through the normal explorer tier. Reviewers never use Luna and apply the reviewer floor defined by the policy.
+The routing JSON selects execution requirements plus an audit profile projection. Canonical Markdown in `agents/` is the sole source of truth for durable role behavior. The installer serializes that behavior into `.codex/agents/*.toml` for external launch, audit, and consistency validation. The bounded `mechanical_read_only` route uses Luna only for `complexity <= 2` and `risk <= 2`; larger mechanical read-only tasks route through the normal explorer tier. Reviewers never use Luna and apply the reviewer floor defined by the policy.
+
+A review dispatch is valid only when it uses the resolver-selected base model, every supported required control, the exact canonical role prompt, and all task inputs. Validity never depends on a native dispatcher accepting a generated TOML filename.
 
 For retries and repeated gates, invoke the resolver again from the same stored scores and record a new evidence entry. Both ExecPhase and ExecTask reference this rule by name; do not duplicate or alter the policy inline.
 
@@ -140,9 +146,9 @@ Six canonical Markdown prompt sources provide the durable role bodies used by th
 | `autviam-search` | `mechanical_read_only` | Bounded mechanical search | search dispatch |
 | `autviam-phase-orchestrator` | `orchestrator` | Runs ScaffoldPhase + ExecPhase for one phase, returns a JSON summary | E2E |
 
-Run `AutViam_C install` once in each consumer repository to generate the nineteen custom TOML profiles under `.codex/agents/`: four implementers, four orchestrators, three Gate A reviewers, three Gate B reviewers, four explorers, and one mechanical-search profile. The installer explicitly pins model, reasoning effort, and sandbox and then runs the exhaustive validator. Start a new Codex session after installation so the custom profiles are discoverable.
+Run `AutViam_C install` once in each consumer repository to generate the nineteen TOML projections under `.codex/agents/`: four implementers, four orchestrators, three Gate A reviewers, three Gate B reviewers, four explorers, and one mechanical-search profile. The installer pins model, effort, and sandbox for external launch and audit consistency. Installation also writes `<skill_root>/runtime/subagent-dispatch-capabilities.json` from the active dispatcher schema and validates every route against it.
 
-At dispatch time, use only the custom `agent` returned by the resolver and pass task-specific data only. Do not prepend or reload the canonical Markdown body: it is already embedded in the generated TOML. Inline reviewer fallback is prohibited because it bypasses Path-2 routing evidence and independent review. If custom profile dispatch is unavailable, halt with a routing precondition failure.
+At dispatch time, follow the resolver-selected mode. Native dispatch loads the returned canonical Markdown prompt and adds task-specific data. External dispatch uses the exact launcher settings and may consume the TOML projection. Inline reviewer fallback is prohibited because it bypasses routing evidence and independent review. A TOML profile is never presumed to be a native nested-agent identity.
 
 The implementer's durable behavior comes from `agents/autviam-implementer.md`; `templates/task_instructions_template.md` carries only per-dispatch task and phase data.
 
@@ -153,9 +159,9 @@ Thirteen helper scripts live at `<skill_root>/scripts/` (reference them as `<ski
 | Script | Owns |
 |---|---|
 | `expand_codex_agents.py` | Deprecated compatibility entry point; always exits nonzero and directs callers to canonical `install_agent_profiles.py`, because template-derived profiles cannot pass exact managed-source validation. |
-| `install_agent_profiles.py` | Idempotently generates nineteen explicit runtime TOML profiles from six canonical role sources in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and Codex serialization. |
-| `resolve_codex_agent.py` | Path-2 fail-closed resolver: validates stored scores, policy, role, selected TOML, model/effort fields, sandbox, reviewer floor, and the bounded Luna route; emits machine-readable dispatch evidence. |
-| `validate_codex_agent_routing.py` | Exhaustively validates all 150 score-role combinations, the full policy matrix, every referenced profile, exact canonical-source rendering, sandbox compatibility, reviewer floor, Luna boundary, and built-in-agent prohibition. |
+| `install_agent_profiles.py` | Idempotently generates nineteen external-launch/audit TOML projections from six canonical role sources in the consumer repo's `.codex/agents/`, preserving unmanaged collisions and pinning model, effort, sandbox, and Codex serialization. |
+| `resolve_codex_agent.py` | Fail-closed resolver: validates stored scores, capability probe, policy, role, prompt, profile projection, reviewer floor, and Luna boundary; emits an executable native/external dispatch specification and evidence. |
+| `validate_codex_agent_routing.py` | Exhaustively validates all 150 score-role combinations, policy and capability shape, exact canonical-source rendering, executable dispatch availability, controlled-vs-uncontrolled fields, reviewer floor, and Luna boundary. |
 | `init_plan.sh` | Per-plan plumbing for Plan-2-Tasks Step 7: slug derivation, folder scaffolding, label diff/create, `gh issue create` (prints the number), issue-map write, task-JSON `github_issue` annotation. |
 | `issue_body.sh` | The two `gh` halves of the canonical issue-body roundtrip (`fetch` → LLM edits → `push`) plus label-only / state / close flags. The LLM still does the Edit between fetch and push — never `sed -i`. |
 | `gate_state.py` | Gate-file + task-JSON machine state: failure counting and the 3-failure cap (`cap-check`), counters-line sync, completion writeback, status set, rollback reset, last-good Gate C SHA, Session Reset Packet rows. |
@@ -195,7 +201,7 @@ No `task_issue` field — phase-issues-only.
 
 ## Post-Install Configuration (`autviam_c_config.json`)
 
-Run `AutViam_C install` once per repo to generate and validate the required custom runtime profiles, then wire up optional repo-specific Codex prompt profiles and skills. The command scans optional repo-local profile and skill folders, proposes trigger patterns, gets user approval, and writes `<skill_root>/autviam_c_config.json`.
+Run `AutViam_C install` once per repo to generate and validate the external-launch/audit profiles and active dispatcher capability record, then wire up optional repo-specific Codex prompt profiles and skills. The command scans optional repo-local profile and skill folders, proposes trigger patterns, gets user approval, and writes `<skill_root>/autviam_c_config.json`.
 
 **What the config enables:**
 - `domain_reviewer.specialists` — read-only prompt lenses used during Gate B when the diff touches matching files. Each specialist's findings carry the same weight as the domain reviewer's own findings. **By default the routed domain reviewer applies each lens inline** (reading its `prompt_file`) rather than adding a nested dispatch. See `agents/autviam-domain-reviewer.md`.

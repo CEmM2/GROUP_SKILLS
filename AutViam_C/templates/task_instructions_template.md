@@ -1,5 +1,7 @@
 Codex routed implementation agent:
-  agent_profile: [exact `agent` from resolve_codex_agent.py]
+  execution_mode: [exact `recommended_mode` from resolve_codex_agent.py]
+  role_prompt: [exact `dispatch.prompt_file` from resolve_codex_agent.py]
+  profile_projection: [audit/external-launch projection; never presumed to be native `agent_type`]
   routing_evidence: [complete resolver output recorded by the dispatcher]
   description: "Implement Task <task_id>: <task_title>"
   prompt: |

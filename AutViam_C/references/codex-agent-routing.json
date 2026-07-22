@@ -71,6 +71,32 @@
       "sol_xhigh": "explorer_sol_xhigh"
     }
   },
+  "dispatch_policy": {
+    "implementer": {
+      "minimum_enforcement": "model_and_prompt",
+      "allow_uncontrolled_effort": false
+    },
+    "orchestrator": {
+      "minimum_enforcement": "model_and_prompt",
+      "allow_uncontrolled_effort": false
+    },
+    "spec_reviewer": {
+      "minimum_enforcement": "exact",
+      "allow_uncontrolled_effort": false
+    },
+    "domain_reviewer": {
+      "minimum_enforcement": "exact",
+      "allow_uncontrolled_effort": false
+    },
+    "explorer": {
+      "minimum_enforcement": "model_and_prompt",
+      "allow_uncontrolled_effort": true
+    },
+    "mechanical_read_only": {
+      "minimum_enforcement": "model_and_prompt",
+      "allow_uncontrolled_effort": true
+    }
+  },
   "special_routes": {
     "mechanical_read_only": {
       "maximum_complexity": 2,
@@ -84,6 +110,8 @@
     "unknown_role": "error",
     "missing_route": "error",
     "missing_agent_profile": "error",
-    "unconfigured_model_or_effort": "error"
+    "unconfigured_model_or_effort": "error",
+    "invalid_dispatcher_capabilities": "error",
+    "missing_prompt_file": "error"
   }
 }

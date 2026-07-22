@@ -1,6 +1,6 @@
 # E2E
 
-Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2-Tasks runs in the main thread once, then each phase either runs **inline** (the `phase` path, in main) or is delegated to the custom orchestrator profile returned by the Path-2 resolver and loaded with the `autviam-phase-orchestrator` prompt body, depending on the resolved nested-dispatch mode. In orchestrator mode the agent returns only a phase summary, so main-agent context grows by ~1–2k tokens per phase instead of ~30–60k.
+Run a plan end-to-end with the main agent staying out of per-task detail. Plan-2-Tasks runs in the main thread once, then each phase either runs **inline** (the `phase` path, in main) or is delegated through the resolver-selected orchestrator execution mode and exact `autviam-phase-orchestrator` prompt, depending on the resolved nested-dispatch mode. In orchestrator mode the agent returns only a phase summary, so main-agent context grows by ~1–2k tokens per phase instead of ~30–60k.
 
 **Inputs:**
 - `<plan_file>` — required
@@ -51,7 +51,7 @@ resume_payload: <only if resume_mode != fresh — see orchestrator spec for shap
 The following instructions defeat the orchestrator pattern. The orchestrator will halt with `status: "blocked-by-precondition"` if it sees them:
 
 - "Do all implementation inline yourself" / "do not dispatch implementers" / "do gate reviews yourself"
-- "No spawn_agent" / "no delegated agents" — environment constraints on custom-profile dispatch must be resolved before E2E runs (Step 0), not papered over in the dispatch prompt. See § Nested-Dispatch capability.
+- "No spawn_agent" / "no delegated agents" — environment constraints on the resolver-selected dispatch mode must be resolved before E2E runs (Step 0), not papered over in the dispatch prompt. See § Nested-Dispatch capability.
 - Re-stating any of the orchestrator's internal rules (gate cap = 3, plan-reading discipline, JSON-by-path, halt triggers). The orchestrator already knows these. Re-stating risks drift if the rules change and is pure cost.
 - Restating ScaffoldPhase or ExecPhase steps. The orchestrator reads them itself.
 - Critical-risk notes that are already in `Phase_<N>_context_summary.md` or task JSONs. The orchestrator reads those.
@@ -63,8 +63,8 @@ The orchestrator pattern requires **two** levels of dispatch: the main agent spa
 Codex defaults `agents.max_depth` to 1, so orchestrator mode normally requires `[agents] max_depth = 2` in the active `config.toml`. The probe remains authoritative because managed policy or the active client may still constrain nesting.
 
 - **`off`** (default) — skip the orchestrator entirely; run each phase inline via the `phase` path (Step 3a, inline branch). Same end-to-end result, more main-thread context per phase. Always works, because it never nests.
-- **`on`** — use the routed custom orchestrator per phase (Step 3a, orchestrator branch). Choose this only when you know the Codex runtime lets it spawn nested routed agents.
-- **`auto`** — after decomposition, run one minimal nesting probe against the first runnable phase. Resolve that phase's maximum stored scores with role `orchestrator`, dispatch that custom profile, and have it resolve role `spec_reviewer` from the same scores before spawning the generated Gate A profile on an "echo PASS" request. Record both resolver results in the phase evidence file with purpose `nesting-probe`. Success → `on`; failure → fall back to `off`. Do not use built-in profiles for the probe.
+- **`on`** — use the routed orchestrator execution specification per phase (Step 3a, orchestrator branch). Choose this only when you know the selected runtime/launcher lets it spawn nested routed agents.
+- **`auto`** — after decomposition, run one minimal nesting probe against the first runnable phase. Resolve that phase's maximum stored scores with role `orchestrator`, execute its recommended mode and exact prompt, then have it resolve role `spec_reviewer` from the same scores before executing that result on an "echo PASS" request. Record both resolver results in the phase evidence file with purpose `nesting-probe`. Success → `on`; failure → fall back to `off`.
 
 Set the mode in `autviam_c_config.json` → `nested_dispatch` (default `"off"` if absent). **There is no "halt and fix" path** — a missing nesting capability is a platform limit, not a config bug, so E2E degrades to the inline path instead of dead-ending.
 
@@ -102,9 +102,9 @@ Only when Step 0 recorded **probe pending**:
 
 - If the run list is empty, skip the probe and use inline mode; there is no phase work to delegate.
 - Otherwise, read the first runnable phase's task JSONs and calculate the maximum stored `complexity` and maximum stored `risk` without changing either score.
-- Invoke the resolver with those aggregate scores and role `orchestrator`, using `<tasks_folder>/Phase_<N>_routing_evidence.json` and purpose `nesting-probe`.
-- Dispatch exactly the returned orchestrator profile. It must resolve role `spec_reviewer` from the same aggregate scores, append that result to the same phase evidence file with purpose `nesting-probe`, and spawn the generated Gate A profile on the bounded "echo PASS" request.
-- If both custom-profile dispatches succeed, resolve mode to orchestrator. Otherwise resolve mode to inline and record the failure; never substitute a built-in profile.
+- Invoke the resolver with `--dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json`, those aggregate scores, and role `orchestrator`, using `<tasks_folder>/Phase_<N>_routing_evidence.json` and purpose `nesting-probe`.
+- Execute the returned mode with its exact orchestrator prompt. It must resolve role `spec_reviewer` from the same aggregate scores, append that result to the same phase evidence file with purpose `nesting-probe`, and execute the returned Gate A mode/prompt on the bounded "echo PASS" request.
+- If both execution specifications succeed, resolve mode to orchestrator. Otherwise resolve mode to inline and record the failure.
 
 ## Step 3 — Phase loop
 
@@ -112,20 +112,22 @@ For each phase in the run list:
 
 ### 3a. Run the phase (branch on the resolved mode)
 
-**Inline mode (`off`, default):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. The implementer and Gate A/B reviewer profiles dispatch as single-level `spawn_agent` calls. There is no dispatch prompt and no orchestrator; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
+**Inline mode (`off`, default):** run the phase in the main thread exactly as `commands/Phase.md` does — ScaffoldPhase (if not already scaffolded) then ExecPhase for phase `<N>`. Implementer and Gate A/B routes execute as single-level native/external dispatches selected by the resolver. There is no orchestrator dispatch prompt; gate-cap and precondition handling come straight from ExecPhase (see § 3c).
 
-**Orchestrator mode (`on`):** take the maximum stored `complexity` and maximum stored `risk` across the phase's tasks, invoke the resolver with role `orchestrator`, and write the complete result to `<tasks_folder>/Phase_<N>_routing_evidence.json` with purpose `phase-orchestrator` and a UTC timestamp. Then dispatch the phase through exactly the returned custom profile:
+**Orchestrator mode (`on`):** take the maximum stored `complexity` and maximum stored `risk` across the phase's tasks, invoke the resolver with the capability file and role `orchestrator`, and write the complete result to `<tasks_folder>/Phase_<N>_routing_evidence.json` with purpose `phase-orchestrator` and a UTC timestamp. Then execute its `recommended_mode`. For a native mode:
 
 ```text
 spawn_agent(
-  agent_type="<resolver.agent>",
+  model="<dispatch.model>",
+  reasoning_effort="<dispatch.reasoning_effort when present>",
   message="""
+Follow the complete role contract at <dispatch.prompt_file>.
 <the dispatch-prompt template from § Dispatch Contract, fully filled>
 """
 )
 ```
 
-The installed orchestrator TOML already embeds the canonical `autviam-phase-orchestrator.md` behavior. The dispatch prompt contains phase data only.
+For `external_exact`, send the same canonical prompt and phase data through `dispatch.launcher` with the exact model, effort, and sandbox. If the result is `unavailable`, block before the phase. Never pass `profile_projection.name` as a native type without explicit dispatcher support.
 
 ### 3b. Read the phase result
 

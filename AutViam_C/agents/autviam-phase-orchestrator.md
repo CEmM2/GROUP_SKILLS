@@ -1,6 +1,6 @@
 ---
 name: autviam-phase-orchestrator
-description: Codex orchestrator prompt body that runs a single AutViam_C phase end-to-end through routed custom implementer and reviewer profiles, runs Gate C, and returns a structured JSON summary.
+description: Codex orchestrator prompt body that runs a single AutViam_C phase end-to-end through capability-aware implementer and reviewer execution specifications, runs Gate C, and returns a structured JSON summary.
 agent_source: true
 ---
 
@@ -12,10 +12,10 @@ Your single purpose is to **resolve and dispatch** custom implementer and review
 
 You MUST:
 
-- Before every task subagent dispatch, run `<skill_root>/scripts/resolve_codex_agent.py --task-json <task-json> ... --evidence-file <same-task-json>` so the resolver reads immutable scores itself, record the full result, and dispatch exactly its `agent` value.
+- Before every task subagent dispatch, run `<skill_root>/scripts/resolve_codex_agent.py --dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json --task-json <task-json> ... --evidence-file <same-task-json>` so the resolver reads immutable scores itself, record the full result, and execute its `recommended_mode`.
 - Use role `implementer` with `<skill_root>/templates/task_instructions_template.md` for every implementation attempt.
-- Use role `spec_reviewer` for every Gate A attempt and `domain_reviewer` for every Gate B attempt. Each installed TOML already embeds its canonical Markdown behavior; pass only task-specific data.
-- Never use built-in `worker`, `explorer`, or `default` profiles and never recompute a task's scores.
+- Use role `spec_reviewer` for every Gate A attempt and `domain_reviewer` for every Gate B attempt. Load the exact `dispatch.prompt_file` for native modes; use the exact external launcher settings for `external_exact`; pass only task-specific data after the role prompt.
+- Never treat `profile_projection.name` as a native agent type unless the capability record explicitly confirms that interface, and never recompute a task's scores.
 
 You MUST NOT:
 
@@ -35,7 +35,7 @@ If the dispatch prompt instructs you to do any of the forbidden things — e.g. 
 
 The one carved-out exception: **Gate C is yours.** Running the test command, reading its output, and applying the Iron Law is part of orchestration, not implementation. Test output is the only diff-adjacent artifact you may read into your own context.
 
-If a resolved custom profile cannot be dispatched in this environment (`spawn_agent` unavailable, profile undiscoverable, or repeatedly failing), that is a precondition violation — return `status: "blocked-by-precondition"` with `error: "resolved Codex agent dispatch unavailable in this environment; orchestrator cannot run as designed"`. The calling agent must install/validate the profiles or resolve the runtime limitation before re-running E2E.
+If the resolver returns `unavailable`, or its selected native/external mode cannot execute in this environment, that is a precondition violation — return `status: "blocked-by-precondition"` with `error: "resolved Codex agent dispatch unavailable in this environment; orchestrator cannot run as designed"`. Never replace a strict gate with inline review.
 
 ## Inputs you receive in the user message
 

@@ -1,6 +1,6 @@
 # Install
 
-Installs and validates AutViam_C's explicit Path-2 runtime profiles, then scans the host repo for optional prompt lenses and skills, presents a categorisation plan, and writes `autviam_c_config.json`.
+Installs and validates AutViam_C's external-launch/audit profile projections, records the active dispatcher capabilities, then scans the host repo for optional prompt lenses and skills, presents a categorisation plan, and writes `autviam_c_config.json`.
 
 Run once per repo after initial install. Re-run after adding new repo-local prompt profiles or skills, or when you want to change the integration. Idempotent — re-running overwrites only what you confirm.
 
@@ -9,9 +9,11 @@ Run once per repo after initial install. Re-run after adding new repo-local prom
 
 ---
 
-## Step 0 — Install and validate required runtime profiles
+## Step 0 — Install projections, probe dispatch, and validate routes
 
-Generate the nineteen managed custom profiles under the consumer repository's `.codex/agents/`:
+### Step 0a — Generate external-launch and audit projections
+
+Generate the nineteen managed TOMLs under the consumer repository's `.codex/agents/`:
 
 ```bash
 python <skill_root>/scripts/install_agent_profiles.py \
@@ -26,23 +28,73 @@ The installer updates only files bearing its managed marker. On an unmanaged fil
 
 When upgrading from the 16-profile layout, the installer retires only its three managed generic `reviewer-*.toml` files after replacing them with separate Gate A and Gate B families. Same-named unmanaged files are preserved.
 
-After a real install, validate the complete policy and all profiles:
+These TOMLs are external-launch profiles, audit projections, and configuration-consistency artifacts. Their filenames and `name` values are not presumed to be native `agent_type` values.
+
+### Step 0b — Probe the active dispatcher interface
+
+Inspect the actual `spawn_agent` (or equivalent) tool schema exposed in this session. Record only controls explicitly present in that schema:
+
+- `supports_custom_agent_type`: true only when the interface explicitly supports installed custom profile identities, not merely because it has a generic role/type parameter.
+- `supports_model_selection`: true only when a per-child model argument exists.
+- `supports_reasoning_effort`: true only when a per-child effort argument exists.
+- `supports_sandbox_override`: true only when a per-child sandbox argument exists.
+- `supported_models`: copy the base-model values advertised by the interface. Do not infer model availability from TOML files.
+
+Then inspect the configured external launcher. For Codex CLI, require `codex exec --help` to confirm model, reasoning-effort/config, and sandbox controls. For an MCP wrapper, inspect its tool schema. Do not mark an external control supported unless the launcher exposes it.
+
+Write the result with a Codex file-editing tool to:
+
+```text
+<skill_root>/runtime/subagent-dispatch-capabilities.json
+```
+
+Shape:
+
+```json
+{
+  "schema_version": 1,
+  "probed_at": "<ISO-8601 UTC>",
+  "supports_custom_agent_type": false,
+  "supports_model_selection": true,
+  "supports_reasoning_effort": false,
+  "supports_sandbox_override": false,
+  "supported_models": ["gpt-5.6-sol", "gpt-5.6-terra"],
+  "external_dispatch": {
+    "available": true,
+    "mode": "codex_cli",
+    "command": ["codex", "exec"],
+    "supports_model_selection": true,
+    "supports_reasoning_effort": true,
+    "supports_sandbox_override": true,
+    "supported_models": ["gpt-5.6-sol", "gpt-5.6-terra"]
+  }
+}
+```
+
+The values above illustrate the schema only. Derive the installed file from the live interfaces. If no exact external launcher exists, set `external_dispatch.available` to `false` and omit its other fields.
+
+For `--dry-run`, report the probed values and intended runtime path without writing it.
+
+### Step 0c — Validate the executable routing matrix
+
+Run:
 
 ```bash
 python <skill_root>/scripts/validate_codex_agent_routing.py \
   --policy <skill_root>/references/codex-agent-routing.json \
-  --agents-dir <repo_root>/.codex/agents
+  --agents-dir <repo_root>/.codex/agents \
+  --dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json
 ```
 
-Any nonzero result is fatal. Do not continue to configuration or dispatch. This validator proves policy, source rendering, and installed TOML consistency; it cannot prove that the active Codex account/runtime can dispatch every pinned model.
+Any nonzero result is fatal. The validator proves that all 150 score/role routes have an executable mode, exact roles have either native exact controls or an exact external launcher, unsupported effort is recorded as uncontrolled, prompt files match their semantic roles, and native commands never depend on custom profile selection.
 
-When installation succeeds, tell the user to start a new Codex session so the custom profiles are discoverable. In that new session, perform a bounded live smoke check before the first real AutViam_C run:
+After installation, perform bounded live smoke checks for each mode that the matrix selected:
 
-1. Resolve and dispatch one `mechanical_read_only` task scored 1/1 through `search_luna_medium`; require the returned subagent to answer only `PASS`.
-2. Resolve and dispatch representative Terra and Sol read-only routes the same way.
-3. Confirm each live subagent reports the exact profile/model selected by the resolver.
+1. Resolve one permissive read-only route and execute its `recommended_mode`; require `PASS`.
+2. Resolve representative Terra and Sol routes and confirm the dispatched base model and canonical prompt.
+3. Resolve Gate B and confirm it uses `native_exact` or `external_exact`; never accept model-only degradation for an exact gate.
 
-If any custom profile or pinned model (especially Luna) is unavailable, Path 2 is blocked in that runtime. Do not substitute a built-in profile or a different model, and do not claim runtime verification from the static validator alone.
+If a selected mode or model is unavailable, routing is blocked in that runtime. Do not substitute a profile, model, effort, prompt, or launcher, and do not claim runtime verification from static files alone.
 
 ## Step 1 — Scan (deterministic)
 
@@ -189,7 +241,7 @@ ExecPhase/ExecTask pick up the config automatically — no restart needed.
 
 The bundled scripts already live at `<skill_root>/scripts/` (`.codex/skills/AutViam_C/scripts/`) — distribution placed them there, and that is the **single** copy everything uses:
 - command files call them as `<skill_root>/scripts/<name>`;
-- `install_agent_profiles.py`, `resolve_codex_agent.py`, and `validate_codex_agent_routing.py` own Path-2 profile installation, resolution, evidence, and exhaustive validation;
+- `install_agent_profiles.py`, `resolve_codex_agent.py`, and `validate_codex_agent_routing.py` own projection installation, execution-spec resolution, evidence, and exhaustive validation;
 - `expand_codex_agents.py` is a deprecated compatibility entry point that exits nonzero and directs callers to `install_agent_profiles.py`; template-derived profiles cannot satisfy Path 2's exact managed-source validation;
 - `project_sync.sh` finds its sibling `update_tracker.sh` in the same dir (`$HERE/update_tracker.sh`);
 - the Step 7 hook points at `<skill_root>/scripts/phase-close.sh`, which resolves its siblings (`issue_body.sh`, `project_sync.sh`, `draft_pr.sh`) from that dir too.
@@ -233,11 +285,11 @@ gh api -X PATCH "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)" -
 
 ## Runtime Notes
 
-- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread; `"on"` uses the routed custom orchestrator profile; `"auto"` performs one routed nesting probe and falls back to `"off"`. Leave it `"off"` unless this Codex runtime lets the custom orchestrator spawn routed subagents. See `commands/E2E.md` § Nested-Dispatch capability.
+- **`nested_dispatch`** (default `"off"`) controls E2E execution: `"off"` runs each phase inline in the main thread; `"on"` uses the resolver-selected orchestrator execution mode; `"auto"` performs one routed nesting probe and falls back to `"off"`. Leave it `"off"` unless this runtime lets the dispatched orchestrator spawn its own routed subagents. See `commands/E2E.md` § Nested-Dispatch capability.
 - Nested orchestrator mode normally requires `[agents] max_depth = 2` in the active Codex `config.toml`; Codex defaults to depth 1. Do not change this automatically—tell the user when `nested_dispatch` is `on` or `auto` and let the capability probe verify it.
 - **`project`** (default `"disable"`) turns on native GitHub Project sync: set it to a board name (or `{owner,name}` / `{owner,number}`) and AutViam_C adds plan/phase issues to that Project and keeps their Status field in step with the issue lifecycle. `"disable"` (or absent) = no Project calls at all. See `references/project_sync.md`.
-- The six bundled Markdown files are the canonical role-behavior sources. The generated `.codex/agents/*.toml` files embed one source body each and add Codex model, effort, sandbox, and serialization metadata; dispatches use the TOML profile directly and do not reload the Markdown.
-- Every dispatch must run `resolve_codex_agent.py` and use exactly its `agent` result. Built-in `worker`, `explorer`, and `default` profiles and parent model/effort inheritance are prohibited.
+- The six bundled Markdown files are the canonical role-behavior sources. Native modes load the returned prompt file explicitly. Generated `.codex/agents/*.toml` files embed the same body for external launch, audit, and consistency checking.
+- Every dispatch must run `resolve_codex_agent.py`, inspect `recommended_mode`, and consume only the returned `dispatch` fields. Never pass `profile_projection.name` as a native `agent_type` unless the live capability probe explicitly confirms that feature.
 - The config is repo-local. It is never pushed upstream to the AutViam_C skill definition.
 - Trigger matching at runtime uses `git diff --name-only` plus the configured regex patterns — deterministic shell, not LLM judgment.
 - The domain reviewer receives a `specialist_agents` list only when at least one changed file matches a specialist's patterns. Empty list → standard review, no specialist dispatch.

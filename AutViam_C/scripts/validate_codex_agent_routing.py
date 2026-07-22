@@ -15,11 +15,13 @@ from resolve_codex_agent import (
     EXPECTED_PROFILE_CONFIG,
     RoutingError,
     default_agents_dir,
+    default_capabilities_path,
     default_policy_path,
     load_json,
     load_profiles,
     resolve_route,
     skill_root,
+    validate_dispatcher_capabilities,
     validate_policy,
 )
 from install_agent_profiles import (
@@ -87,34 +89,50 @@ def validate_against_schema(
     if "$ref" in schema:
         reference = schema["$ref"]
         if not isinstance(reference, str) or not reference.startswith("#/"):
-            raise ValidationError(f"{location}: unsupported schema reference {reference!r}")
+            raise ValidationError(
+                f"{location}: unsupported schema reference {reference!r}"
+            )
         target: Any = root_schema
         for component in reference[2:].split("/"):
             try:
                 target = target[component.replace("~1", "/").replace("~0", "~")]
             except (KeyError, TypeError) as exc:
-                raise ValidationError(f"{location}: unresolved schema reference {reference!r}") from exc
+                raise ValidationError(
+                    f"{location}: unresolved schema reference {reference!r}"
+                ) from exc
         validate_against_schema(value, target, root_schema, location)
         return
 
     expected_type = schema.get("type")
     if expected_type is not None and not _schema_type_matches(value, expected_type):
-        raise ValidationError(f"{location}: expected JSON type {expected_type}, found {type(value).__name__}")
+        raise ValidationError(
+            f"{location}: expected JSON type {expected_type}, found {type(value).__name__}"
+        )
     if "const" in schema and value != schema["const"]:
-        raise ValidationError(f"{location}: expected constant {schema['const']!r}, found {value!r}")
+        raise ValidationError(
+            f"{location}: expected constant {schema['const']!r}, found {value!r}"
+        )
     if "enum" in schema and value not in schema["enum"]:
-        raise ValidationError(f"{location}: value {value!r} is not in {schema['enum']!r}")
+        raise ValidationError(
+            f"{location}: value {value!r} is not in {schema['enum']!r}"
+        )
     if isinstance(value, str):
         if len(value) < schema.get("minLength", 0):
             raise ValidationError(f"{location}: string is shorter than minLength")
         pattern = schema.get("pattern")
         if pattern is not None and re.search(pattern, value) is None:
-            raise ValidationError(f"{location}: string does not match pattern {pattern!r}")
+            raise ValidationError(
+                f"{location}: string does not match pattern {pattern!r}"
+            )
     if isinstance(value, int) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:
-            raise ValidationError(f"{location}: value is below minimum {schema['minimum']}")
+            raise ValidationError(
+                f"{location}: value is below minimum {schema['minimum']}"
+            )
         if "maximum" in schema and value > schema["maximum"]:
-            raise ValidationError(f"{location}: value is above maximum {schema['maximum']}")
+            raise ValidationError(
+                f"{location}: value is above maximum {schema['maximum']}"
+            )
     if isinstance(value, dict):
         required = schema.get("required", [])
         missing = sorted(set(required) - value.keys())
@@ -127,7 +145,9 @@ def validate_against_schema(
                 raise ValidationError(f"{location}: unexpected properties {unexpected}")
         for key, child in value.items():
             if key in properties:
-                validate_against_schema(child, properties[key], root_schema, f"{location}.{key}")
+                validate_against_schema(
+                    child, properties[key], root_schema, f"{location}.{key}"
+                )
 
 
 def referenced_agents(policy: Mapping[str, Any]) -> set[str]:
@@ -144,13 +164,19 @@ def expected_config_for_agent(agent: str) -> tuple[str, str]:
     for tier in ("terra_medium", "terra_high", "sol_high", "sol_xhigh", "luna_medium"):
         if agent.endswith(tier):
             return EXPECTED_PROFILE_CONFIG[tier]
-    raise ValidationError(f"cannot infer the configured tier from agent profile name {agent!r}")
+    raise ValidationError(
+        f"cannot infer the configured tier from agent profile name {agent!r}"
+    )
 
 
-def validate_profiles(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path, dict[str, Any]]]) -> int:
+def validate_profiles(
+    policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path, dict[str, Any]]]
+) -> int:
     agents = referenced_agents(policy)
     if agents & BUILT_IN_AGENTS:
-        raise ValidationError(f"policy selects built-in profiles: {sorted(agents & BUILT_IN_AGENTS)}")
+        raise ValidationError(
+            f"policy selects built-in profiles: {sorted(agents & BUILT_IN_AGENTS)}"
+        )
     missing = sorted(agents - profiles.keys())
     if missing:
         raise ValidationError(f"policy-selected agent profiles are missing: {missing}")
@@ -167,7 +193,9 @@ def validate_profiles(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Pa
         path, profile = profiles[agent]
         spec = specs_by_name.get(agent)
         if spec is None:
-            raise ValidationError(f"policy selected profile with no bundled managed specification: {agent!r}")
+            raise ValidationError(
+                f"policy selected profile with no bundled managed specification: {agent!r}"
+            )
         actual_text = path.read_text(encoding="utf-8")
         validate_rendered(spec, actual_text, PINNED_MODELS)
         if actual_text != expected_profiles[agent]:
@@ -176,9 +204,13 @@ def validate_profiles(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Pa
             )
         expected_model, expected_effort = expected_config_for_agent(agent)
         if profile.get("name") != agent:
-            raise ValidationError(f"{path}: profile name does not match route {agent!r}")
+            raise ValidationError(
+                f"{path}: profile name does not match route {agent!r}"
+            )
         if profile.get("model") != expected_model:
-            raise ValidationError(f"{path}: expected model {expected_model!r}, found {profile.get('model')!r}")
+            raise ValidationError(
+                f"{path}: expected model {expected_model!r}, found {profile.get('model')!r}"
+            )
         if profile.get("model_reasoning_effort") != expected_effort:
             raise ValidationError(
                 f"{path}: expected model_reasoning_effort {expected_effort!r}, "
@@ -204,7 +236,11 @@ def validate_matrix(policy: Mapping[str, Any]) -> None:
             )
 
 
-def validate_routes(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path, dict[str, Any]]]) -> int:
+def validate_routes(
+    policy: Mapping[str, Any],
+    profiles: Mapping[str, tuple[Path, dict[str, Any]]],
+    capabilities: Mapping[str, Any],
+) -> int:
     routes_checked = 0
     for complexity in range(1, 6):
         for risk in range(1, 6):
@@ -212,6 +248,7 @@ def validate_routes(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path
                 result = resolve_route(
                     policy,
                     profiles,
+                    capabilities,
                     complexity=complexity,
                     risk=risk,
                     role=role,
@@ -219,22 +256,67 @@ def validate_routes(policy: Mapping[str, Any], profiles: Mapping[str, tuple[Path
                 routes_checked += 1
                 if role == "mechanical_read_only":
                     should_use_luna = complexity <= 2 and risk <= 2
-                    uses_luna = result["model"] == "gpt-5.6-luna"
+                    uses_luna = result["required"]["model"] == "gpt-5.6-luna"
                     if uses_luna != should_use_luna:
-                        raise ValidationError("mechanical_read_only Luna boundary is not enforced")
+                        raise ValidationError(
+                            "mechanical_read_only Luna boundary is not enforced"
+                        )
                 if role in {"spec_reviewer", "domain_reviewer"}:
                     tier = EXPECTED_TIER_BY_SCORE[(complexity, risk)]
                     prefix = role
-                    if tier == "terra_medium" and result["agent"] != f"{prefix}_terra_high":
-                        raise ValidationError("reviewer floor is missing for a routine task")
-                    if tier in {"terra_high", "sol_high"} and result["agent"] != f"{prefix}_sol_high":
-                        raise ValidationError("reviewer floor is missing for a moderate or elevated task")
-                    if result["model"] == "gpt-5.6-luna":
+                    projected = result["profile_projection"]["name"]
+                    if tier == "terra_medium" and projected != f"{prefix}_terra_high":
+                        raise ValidationError(
+                            "reviewer floor is missing for a routine task"
+                        )
+                    if (
+                        tier in {"terra_high", "sol_high"}
+                        and projected != f"{prefix}_sol_high"
+                    ):
+                        raise ValidationError(
+                            "reviewer floor is missing for a moderate or elevated task"
+                        )
+                    if result["required"]["model"] == "gpt-5.6-luna":
                         raise ValidationError("reviewer route selected Luna")
+                mode = result["recommended_mode"]
+                if mode == "unavailable":
+                    raise ValidationError(
+                        f"role={role!r}, complexity={complexity}, risk={risk} has no executable dispatch route"
+                    )
+                dispatch = result["dispatch"]
+                if "agent_type" in dispatch:
+                    raise ValidationError(
+                        "execution dispatch must not pass profile projections as agent_type"
+                    )
+                if mode.startswith("native"):
+                    if (
+                        result["required"]["model"]
+                        not in capabilities["supported_models"]
+                    ):
+                        raise ValidationError(
+                            "native dispatch selected a model absent from supported_models"
+                        )
+                    if (
+                        mode == "native_model_prompt"
+                        and not capabilities["supports_reasoning_effort"]
+                    ):
+                        if dispatch.get("effective_effort") != "uncontrolled":
+                            raise ValidationError(
+                                "unsupported native effort masquerades as enforced effort"
+                            )
+                prompt_file = Path(result["required"]["prompt_file"])
+                if not prompt_file.is_file():
+                    raise ValidationError(
+                        f"canonical prompt file is missing: {prompt_file}"
+                    )
     return routes_checked
 
 
-def validate_configuration(policy_path: Path, agents_dir: Path) -> dict[str, Any]:
+def validate_configuration(
+    policy_path: Path,
+    agents_dir: Path,
+    capabilities_path: Path,
+) -> dict[str, Any]:
     policy = load_json(policy_path, "routing policy")
     validate_policy(policy)
     schema_path = policy_path.parent / "codex-agent-routing.schema.json"
@@ -243,14 +325,18 @@ def validate_configuration(policy_path: Path, agents_dir: Path) -> dict[str, Any
         raise ValidationError("routing schema must declare JSON Schema draft 2020-12")
     validate_against_schema(policy, schema, schema)
     profiles = load_profiles(agents_dir)
+    capabilities = validate_dispatcher_capabilities(
+        load_json(capabilities_path, "dispatcher capabilities")
+    )
     validate_matrix(policy)
     profiles_checked = validate_profiles(policy, profiles)
-    routes_checked = validate_routes(policy, profiles)
+    routes_checked = validate_routes(policy, profiles, capabilities)
     return {
         "valid": True,
         "policy_version": policy["policy_version"],
         "policy": str(policy_path),
         "agents_dir": str(agents_dir),
+        "dispatcher_capabilities": str(capabilities_path),
         "routes_checked": routes_checked,
         "profiles_checked": profiles_checked,
     }
@@ -260,13 +346,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--policy", type=Path, default=default_policy_path())
     parser.add_argument("--agents-dir", type=Path, default=default_agents_dir())
+    parser.add_argument(
+        "--dispatcher-capabilities",
+        type=Path,
+        default=default_capabilities_path(),
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    report = validate_configuration(args.policy.resolve(), args.agents_dir.resolve())
+    report = validate_configuration(
+        args.policy.resolve(),
+        args.agents_dir.resolve(),
+        args.dispatcher_capabilities.resolve(),
+    )
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:

@@ -8,6 +8,7 @@
     "policy_version",
     "base_tier_by_score",
     "profiles_by_role_and_tier",
+    "dispatch_policy",
     "special_routes",
     "failure_policy"
   ],
@@ -37,6 +38,19 @@
         "spec_reviewer": { "$ref": "#/$defs/tier_profiles" },
         "domain_reviewer": { "$ref": "#/$defs/tier_profiles" },
         "explorer": { "$ref": "#/$defs/tier_profiles" }
+      }
+    },
+    "dispatch_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementer", "orchestrator", "spec_reviewer", "domain_reviewer", "explorer", "mechanical_read_only"],
+      "properties": {
+        "implementer": { "$ref": "#/$defs/dispatch_requirement" },
+        "orchestrator": { "$ref": "#/$defs/dispatch_requirement" },
+        "spec_reviewer": { "$ref": "#/$defs/dispatch_requirement" },
+        "domain_reviewer": { "$ref": "#/$defs/dispatch_requirement" },
+        "explorer": { "$ref": "#/$defs/dispatch_requirement" },
+        "mechanical_read_only": { "$ref": "#/$defs/dispatch_requirement" }
       }
     },
     "special_routes": {
@@ -70,14 +84,18 @@
         "unknown_role",
         "missing_route",
         "missing_agent_profile",
-        "unconfigured_model_or_effort"
+        "unconfigured_model_or_effort",
+        "invalid_dispatcher_capabilities",
+        "missing_prompt_file"
       ],
       "properties": {
         "invalid_score": { "const": "error" },
         "unknown_role": { "const": "error" },
         "missing_route": { "const": "error" },
         "missing_agent_profile": { "const": "error" },
-        "unconfigured_model_or_effort": { "const": "error" }
+        "unconfigured_model_or_effort": { "const": "error" },
+        "invalid_dispatcher_capabilities": { "const": "error" },
+        "missing_prompt_file": { "const": "error" }
       }
     }
   },
@@ -110,6 +128,15 @@
         "terra_high": { "$ref": "#/$defs/agent_name" },
         "sol_high": { "$ref": "#/$defs/agent_name" },
         "sol_xhigh": { "$ref": "#/$defs/agent_name" }
+      }
+    },
+    "dispatch_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_enforcement", "allow_uncontrolled_effort"],
+      "properties": {
+        "minimum_enforcement": { "enum": ["exact", "model_and_prompt"] },
+        "allow_uncontrolled_effort": { "type": "boolean" }
       }
     }
   }

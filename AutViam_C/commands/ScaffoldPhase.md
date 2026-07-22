@@ -70,7 +70,7 @@ Create or update `<tasks_folder>/Phase_<phase_id>_Scaffold_Validation.md`:
 
 ## Step 4 — Generate test stubs (parallel routed agents)
 
-For each task in `<phase_id>`, apply SKILL.md § Codex Agent Assignment with `--task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose scaffold`, and dispatch exactly the custom profile returned by the resolver. If a legacy task lacks either score, assign both once with `references/codex-routing-scoring.md`, write them to its JSON, and mark `legacy_score_backfill: true` before invoking the resolver. Never pass copied task scores with raw `--complexity/--risk`. Spawn all eligible agents in parallel, one per task, up to 4 concurrent. A routing failure is fatal; do not substitute a built-in profile.
+For each task in `<phase_id>`, apply SKILL.md § Codex Agent Assignment with `--dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json --task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose scaffold`, then execute the resolver-selected mode with the exact returned implementer prompt and task inputs. If a legacy task lacks either score, assign both once with `references/codex-routing-scoring.md`, write them to its JSON, and mark `legacy_score_backfill: true` before invoking the resolver. Never pass copied task scores with raw `--complexity/--risk`, and never treat `profile_projection.name` as a native type without an explicit capability. Spawn all eligible agents in parallel, one per task, up to 4 concurrent. A routing failure or `unavailable` mode is fatal.
 
 **Pass to each routed agent (do NOT paste the JSON):**
 

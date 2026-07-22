@@ -31,7 +31,27 @@ For each task in `<phase_id>`, read the stored `complexity` and `risk` and write
 
 Do not recompute existing scores. For a legacy task missing either value, use `references/codex-routing-scoring.md` to assign both once, write them into its task JSON, and mark the analysis rationale `legacy_score_backfill: true`.
 
-Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, dispatch purpose, and UTC timestamp to that same task JSON's `routing_evidence` array using the format in `references/codex-routing-scoring.md`. A nonzero resolver exit or unavailable returned profile is a fatal `blocked-by-precondition`; do not use a built-in or inline fallback.
+Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json --task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, dispatch purpose, and UTC timestamp to that same task JSON's `routing_evidence` array using the format in `references/codex-routing-scoring.md`. A nonzero resolver exit or `recommended_mode: "unavailable"` is a fatal `blocked-by-precondition`; do not use an inline fallback.
+
+For every role, execute the returned mode exactly:
+
+1. `native_exact`: load `dispatch.prompt_file`, then call the native dispatcher with `dispatch.model`, `dispatch.reasoning_effort`, the sandbox control only when exposed by that dispatcher, and task-specific inputs appended to the canonical role prompt.
+2. `native_model_prompt`: load the same prompt and dispatch `dispatch.model`. Pass effort or sandbox only when those keys exist. Preserve `requested_effort`, `effective_effort`, `uncontrolled_fields`, and `degradation` in routing evidence.
+3. `external_exact`: use `dispatch.launcher` to start the configured Codex CLI/MCP route with `dispatch.model`, `dispatch.reasoning_effort`, `dispatch.sandbox_mode`, the exact prompt file, and task inputs.
+4. `unavailable`: stop before the task or gate. Never manufacture a verdict.
+
+For a probed Codex CLI launcher, the equivalent invocation is:
+
+```bash
+codex exec -m "<dispatch.model>" \
+  -c 'model_reasoning_effort="<dispatch.reasoning_effort>"' \
+  -s "<dispatch.sandbox_mode>" \
+  '<complete canonical role prompt followed by task-specific inputs>'
+```
+
+Use only flags confirmed by the external-launch capability probe; an MCP launcher may expose different argument names while enforcing the same returned requirements.
+
+`profile_projection` is audit/external-launch data. Never pass `profile_projection.name` to the native dispatcher unless the capability record explicitly confirms installed custom-profile selection.
 
 ## Step 3 — Branch setup
 
@@ -48,7 +68,7 @@ It checks out `<plan_slug>_phase-<phase_id>`, creating it from the **plan branch
 
 ## Step 5 — Implementer dispatch (per task)
 
-Run the resolver with `--task-json <tasks_folder>/json/<task_id>.json --role implementer --evidence-file <same-task-json> --purpose implementer`, then dispatch exactly the returned custom profile using `templates/task_instructions_template.md`. The template tells the implementer to read the task JSON itself — **do not paste JSON content into the prompt**.
+Run the resolver with `--dispatcher-capabilities <capabilities-file> --task-json <tasks_folder>/json/<task_id>.json --role implementer --evidence-file <same-task-json> --purpose implementer`, then execute its `recommended_mode` using the canonical prompt plus `templates/task_instructions_template.md`. The template tells the implementer to read the task JSON itself — **do not paste JSON content into the prompt**.
 
 Routed implementation agents may operate in forked workspaces. The calling agent remains responsible for reviewing/integrating returned changes into the current workspace, running Gate C, and creating commits after gates pass. If the environment applies agent edits directly, still treat the main pipeline as the owner of branch state and commits.
 
@@ -88,10 +108,11 @@ On the **3rd** failure of any one gate, the next attempt is the last. When `cap-
 
 ### Gate A — Spec Compliance
 
-Run the resolver again with `--task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, then dispatch exactly the returned custom profile. Its installed TOML already embeds the canonical `autviam-spec-reviewer.md` behavior, so pass task data only:
+Run the resolver again with `--dispatcher-capabilities <capabilities-file> --task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, then execute its returned mode. For a native mode, use the supported base model and load the exact returned `autviam-spec-reviewer.md` prompt before the task data:
 
 ```text
-spawn_agent(agent_type="<resolver.agent>", message="""
+spawn_agent(model="<dispatch.model>", reasoning_effort="<dispatch.reasoning_effort when present>", message="""
+Follow the complete role contract at <dispatch.prompt_file>.
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>
@@ -100,7 +121,7 @@ prior_failure_summary: <only if retry — copy the Issues list from the prior ga
 """)
 ```
 
-If the returned custom profile cannot be dispatched, stop with `blocked-by-precondition`. Do not perform Gate A inline or use a built-in profile.
+For `external_exact`, send the same prompt and fields through `dispatch.launcher` with its exact model, effort, and sandbox. If the selected mode cannot be executed, stop with `blocked-by-precondition`. Do not perform Gate A inline.
 
 Parse the verdict line. On FAIL: record the failure entry in the gates file (1–2 sentences + JSON block with `gate:"A"`, `result:"fail"`, `failure_mode`, `what_failed`, `why`), then run `gate_state.py cap-check … <task_id> A` (→ Step 7 on `CAP-HIT`) and `gate_state.py sync-counters … <task_id>`. Pass the agent's Issues list to the implementer, ask it to fix, re-run Gate A.
 
@@ -115,10 +136,11 @@ It prints the JSON array of `domain_reviewer.specialists` entries whose `trigger
 Use the array as `specialist_agents`. If it is empty, omit the field from the prompt
 (backward compatible — reviewer skips the specialist section entirely).
 
-Run the resolver again with `--task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`, then dispatch exactly the returned custom profile. Its installed TOML already embeds the canonical `autviam-domain-reviewer.md` behavior, so pass task data only:
+Run the resolver again with `--dispatcher-capabilities <capabilities-file> --task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`, then execute its returned mode. Gate B's policy is `exact`: `native_model_prompt` is invalid. A native exact call loads the returned canonical `autviam-domain-reviewer.md` prompt; otherwise use `external_exact`:
 
 ```text
-spawn_agent(agent_type="<resolver.agent>", message="""
+spawn_agent(model="<dispatch.model>", reasoning_effort="<dispatch.reasoning_effort>", message="""
+Follow the complete role contract at <dispatch.prompt_file>.
 task_json_path: <tasks_folder>/json/<task_id>.json
 base_sha: <pre-task SHA>
 head_sha: <current HEAD>
@@ -129,6 +151,8 @@ prior_failure_summary: <only if retry>
 specialist_agents: <JSON list — omit line if empty>
 """)
 ```
+
+If the exact native interface cannot enforce every required control, use `dispatch.launcher`; if no exact launcher is available, block before Gate B and record no verdict.
 
 On FAIL: record the failure entry (JSON block with `gate:"B"`, `result:"fail"`), then run `gate_state.py cap-check … <task_id> B` (→ Step 7 on `CAP-HIT`) and `gate_state.py sync-counters … <task_id>`. Pass Issues list to implementer, re-run **Gate A then Gate B** (Gate A may regress on fixes).
 

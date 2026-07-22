@@ -26,7 +26,9 @@ Open `<plan_file>` only at the task's `plan_lines` range — never in full.
 
 Read the task's stored `complexity` and `risk`; do not recompute them. For a legacy task missing either value, assign both once using `references/codex-routing-scoring.md`, write them to the task JSON, and record `legacy_score_backfill: true`.
 
-Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, purpose, and UTC timestamp to that same file's `routing_evidence` using `references/codex-routing-scoring.md`. A resolver failure or unavailable returned profile is a fatal `blocked-by-precondition`; do not use a built-in or inline fallback.
+Apply SKILL.md § Codex Agent Assignment before every dispatch. Invoke the resolver with `--dispatcher-capabilities <skill_root>/runtime/subagent-dispatch-capabilities.json --task-json <tasks_folder>/json/<task_id>.json`; never copy scores onto the command line for a task dispatch. Append each complete resolver result, purpose, and UTC timestamp to that same file's `routing_evidence` using `references/codex-routing-scoring.md`. A resolver failure or `recommended_mode: "unavailable"` is a fatal `blocked-by-precondition`; do not use an inline fallback.
+
+For each resolver result: `native_exact` dispatches the returned supported model, effort, sandbox control when exposed, and exact canonical prompt; `native_model_prompt` dispatches the returned model and prompt while recording every uncontrolled field; `external_exact` invokes the returned CLI/MCP launcher with exact model, effort, sandbox, prompt, and task inputs; `unavailable` blocks before work or review. `profile_projection.name` is not a native `agent_type` unless the capability probe explicitly proves custom-profile support.
 
 ## Step 2 — Branch setup
 
@@ -38,7 +40,7 @@ It checks out (or creates) `<plan_slug>_phase-<phase>`, **refuses on a dirty wor
 
 ## Step 3 — Implementer dispatch
 
-Run the resolver with `--task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose implementer`, and dispatch exactly its returned custom profile using `templates/task_instructions_template.md`. Pass paths and excerpts only — do not paste JSON content. The calling agent owns integration, gate execution, and final commits after the implementation agent returns.
+Run the resolver with `--dispatcher-capabilities <capabilities-file> --task-json <task-json> --role implementer --evidence-file <same-task-json> --purpose implementer`, execute its selected mode using the returned canonical prompt plus `templates/task_instructions_template.md`, and pass paths/excerpts only — do not paste JSON content. The calling agent owns integration, gate execution, and final commits after the implementation agent returns.
 
 **Pre-dispatch skill check (deterministic):** same as ExecPhase Step 5 —
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json implementer.skills <base_sha> <head_sha>`
@@ -55,7 +57,7 @@ Initialize the gate file and task entry in `gates/phase_<phase>_gates.md`:
 Run A → B → C in sequence. The gates file is the source of truth for the per-gate failure count — after recording each FAIL block, run `gate_state.py cap-check <tasks_folder>/gates/phase_<phase>_gates.md <task_id> <gate>` (→ cap step on `CAP-HIT`) and `gate_state.py sync-counters <tasks_folder>/gates/phase_<phase>_gates.md <task_id>`. Never track failure counts in memory.
 
 ### Gate A — Spec Compliance
-Run the resolver again with `--task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, and dispatch exactly its returned custom profile with task data only (see ExecPhase Step 6). The installed TOML already embeds the canonical Gate A behavior. Parse the verdict. If dispatch is unavailable, stop with `blocked-by-precondition`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
+Run the resolver again with `--dispatcher-capabilities <capabilities-file> --task-json <task-json> --role spec_reviewer --evidence-file <same-task-json> --purpose gate-a`, execute its selected mode with the exact returned Gate A prompt and task data (see ExecPhase Step 6), then parse the verdict. If dispatch is unavailable, stop with `blocked-by-precondition`. On FAIL: record the JSON block (`gate:"A"`, `result:"fail"`), run `cap-check … A` + `sync-counters`, then loop.
 
 ### Gate B — Domain Quality
 Only after Gate A passes.
@@ -64,7 +66,7 @@ Only after Gate A passes.
 → `<skill_root>/scripts/match_specialists.sh <skill_root>/autviam_c_config.json domain_reviewer.specialists <base_sha> <head_sha>`
 prints the JSON array of matched specialists (or `[]`). Use it as `specialist_agents`; omit from the domain reviewer prompt when empty.
 
-Run the resolver again with `--task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`, and dispatch exactly its returned custom profile with task data only. The installed TOML already embeds the canonical Gate B behavior. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
+Run the resolver again with `--dispatcher-capabilities <capabilities-file> --task-json <task-json> --role domain_reviewer --evidence-file <same-task-json> --purpose gate-b`. Gate B requires `native_exact` or `external_exact`; execute the selected mode with the exact returned Gate B prompt and task data. If the result is `native_model_prompt` or `unavailable`, block before the gate and do not record a verdict. On FAIL: record the JSON block (`gate:"B"`, `result:"fail"`), run `cap-check … B` + `sync-counters`, re-run **Gate A then Gate B**.
 
 ### Gate C — Verification
 Run task tests fresh. Apply the Iron Law: identify → run → read → require ≥ 95% on task-relevant tests → record exact counts. No "should pass" claims. On FAIL: record the JSON block (`gate:"C"`, `result:"fail"`), run `cap-check … C` + `sync-counters`. On PASS, the Gate C JSON block records `result:"pass"` + the `commit` SHA (read later by `last-good-sha` for rollback).

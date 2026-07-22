@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Install AutViam_C runtime Codex agent profiles from the bundled Markdown sources.
+Install AutViam_C external-launch and audit profile projections.
 
 Expected location:
     <skill_root>/scripts/install_agent_profiles.py
@@ -13,7 +13,7 @@ Canonical sources:
     <skill_root>/agents/autviam-explorer.md
     <skill_root>/agents/autviam-search.md
 
-Generated runtime profiles:
+Generated external-launch/audit projections:
     <repo_root>/.codex/agents/*.toml
 
 Python 3.11+; no third-party dependencies.
@@ -114,7 +114,7 @@ PINNED_MODELS = {
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Install generated AutViam_C Codex runtime agent profiles.",
+        description="Install generated AutViam_C external-launch and audit profile projections.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--skill-root", type=Path, help="AutViam_C skill root; defaults to this script's parent.parent.")
@@ -246,6 +246,8 @@ def render_profile(spec: RuntimeProfileSpec, models: Mapping[str, str], sources:
     source_path = source.path.relative_to(skill_root).as_posix()
     return "\n".join([
         MANAGED_MARKER,
+        "# purpose = external-launch profile, audit projection, and configuration consistency artifact",
+        "# Native nested-agent identity is not implied by this filename or profile name.",
         f"# canonical_source = {source_path}",
         f"# source_sha256 = {source.sha256}",
         "# Do not hand-edit unless you intentionally take ownership of this file.",
@@ -426,6 +428,7 @@ def make_report(skill_root: Path, repo_root: Path, output_dir: Path, sources: Ma
                 "model": models[spec.model_family],
                 "model_reasoning_effort": spec.effort,
                 "sandbox_mode": spec.sandbox_mode,
+                "purposes": ["external_launch", "audit_projection", "configuration_consistency"],
             }
             for spec in PROFILE_SPECS
         ],
@@ -437,7 +440,7 @@ def emit(report: Mapping[str, Any], as_json: bool) -> None:
     if as_json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return
-    print("AutViam_C runtime agent profiles")
+    print("AutViam_C external-launch and audit profile projections")
     print(f"  output : {report['output_dir']}")
     print(f"  status : {'complete' if report['complete'] else 'incomplete'}")
     print(f"  count  : {len(report['profiles'])}\n")

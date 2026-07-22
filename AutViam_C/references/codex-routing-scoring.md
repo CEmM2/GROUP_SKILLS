@@ -57,11 +57,42 @@ Append one evidence object for every dispatch attempt by passing `--evidence-fil
     "role": "domain_reviewer",
     "effective_role": "domain_reviewer",
     "tier": "sol_high",
-    "agent": "domain_reviewer_sol_high",
-    "profile_path": "<repo>/.codex/agents/domain-reviewer-sol-high.toml",
-    "model": "gpt-5.6-sol",
-    "model_reasoning_effort": "high",
-    "sandbox_mode": "read-only"
+    "required": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "sandbox_mode": "read-only",
+      "prompt_file": "<skill_root>/agents/autviam-domain-reviewer.md"
+    },
+    "native_dispatch": {
+      "supported": true,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort_supported": false,
+      "sandbox_override_supported": false,
+      "custom_profile_supported": false
+    },
+    "external_dispatch": {
+      "supported": true,
+      "profile": "domain_reviewer_sol_high",
+      "profile_file": "<repo>/.codex/agents/domain-reviewer-sol-high.toml",
+      "mode": "codex_cli",
+      "command": ["codex", "exec"]
+    },
+    "recommended_mode": "external_exact",
+    "dispatch": {
+      "mode": "external_exact",
+      "routing_enforcement": "exact",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "sandbox_mode": "read-only",
+      "prompt_file": "<skill_root>/agents/autviam-domain-reviewer.md",
+      "launcher": {"mode": "codex_cli", "command": ["codex", "exec"]},
+      "controlled_fields": ["model", "reasoning_effort", "sandbox_mode", "prompt_file"],
+      "uncontrolled_fields": []
+    },
+    "profile_projection": {
+      "name": "domain_reviewer_sol_high",
+      "file": "<repo>/.codex/agents/domain-reviewer-sol-high.toml"
+    }
   }
 }
 ```
