@@ -82,6 +82,30 @@ def assert_unique_task_provenance(repo_root: Path, task_path: Path, task: dict[s
         raise DispatchError("task routing provenance is ambiguous or does not match the canonical plan task")
 
 
+def record_denial(routing_root: Path, input_value: Any, reason: str) -> None:
+    """Append the observed dispatch identity for a denied Agent call."""
+    observed = input_value if isinstance(input_value, dict) else {}
+    tool_input = observed.get("tool_input")
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
+    prompt = tool_input.get("prompt")
+    match = TICKET_PATTERN.search(prompt) if isinstance(prompt, str) else None
+    record = {
+        "observed_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "reason": reason,
+        "session_id": observed.get("session_id"),
+        "agent_id": observed.get("agent_id"),
+        "agent_type": observed.get("agent_type"),
+        "parent_agent_type": observed.get("parent_agent_type"),
+        "requested_agent": tool_input.get("subagent_type") or tool_input.get("agent_type"),
+        "ticket_path": match.group(1) if match else None,
+    }
+    denial_path = routing_root / "dispatch-denials.jsonl"
+    with directory_lock(denial_path):
+        denial_path.parent.mkdir(parents=True, exist_ok=True)
+        with denial_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def validate(
     input_value: dict[str, Any],
     *,
@@ -273,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ticket-key", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
     args = parser.parse_args(argv)
+    input_value: Any = None
     try:
         input_value = json.load(sys.stdin)
         if not isinstance(input_value, dict):
@@ -290,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(output))
         return 0
     except (DispatchError, ResolveError, RoutingCommonError, json.JSONDecodeError) as exc:
+        with contextlib.suppress(Exception):  # Telemetry must never alter the deny decision.
+            record_denial(args.ticket_dir.resolve().parent, input_value, str(exc))
         print(json.dumps(decision("deny", str(exc))))
         return 0
 

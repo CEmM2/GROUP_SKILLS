@@ -278,7 +278,13 @@ def migrate_config(path: Path, dry_run: bool) -> dict[str, Any]:
 def ensure_ticket_key(repo_root: Path, dry_run: bool) -> Path:
     key_path = repo_root / ".claude" / "autviam-routing" / "ticket.key"
     ignore_path = key_path.parent / ".gitignore"
-    ignore_entries = ("ticket.key", "tickets/", "subagent-start.jsonl", "probe-*.json")
+    ignore_entries = (
+        "ticket.key",
+        "tickets/",
+        "subagent-start.jsonl",
+        "dispatch-denials.jsonl",
+        "probe-*.json",
+    )
     if not dry_run:
         existing = ignore_path.read_text(encoding="utf-8").splitlines() if ignore_path.exists() else []
         updated = [*existing, *(entry for entry in ignore_entries if entry not in existing)]
