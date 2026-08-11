@@ -5,7 +5,7 @@ description: Claude conversational façade for the shared AutViam Whatter profil
 
 # AutViam
 
-AutViam is a thin Claude-facing façade over the independently versioned shared profile at `profiles/autviam`. It contains no scheduler, gate, prompt, or mutable task-state implementation.
+AutViam is a thin Claude-facing façade over the independently versioned shared profile published at `<skills-root>/shared/profiles/autviam`. It contains no scheduler, gate, prompt, or mutable task-state implementation.
 
 Before interpreting a command, resolve the shared bootstrap:
 
@@ -14,7 +14,7 @@ python <skills-root>/shared/scripts/autviam_facade.py \
   --facade claude --skill-root <skills-root>/AutViam --command <command> [arguments]
 ```
 
-It blocks clearly when Whatter or the profile is missing and only emits a Whatter command; it never executes one or selects a fallback.
+It blocks clearly when Whatter or the profile is missing and only emits a `whatter_invocation`; it never executes one or selects a fallback. Execute the returned `argv` with the returned `env` merged into the process environment. The `WHATTER_AUTVIAM_PROFILE` binding is mandatory: do not reconstruct or execute a bare Whatter command from the table below.
 
 | Command | Whatter CLI |
 |---|---|

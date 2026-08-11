@@ -1,0 +1,67 @@
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-a2-3-minimal
+  title: A2-3 minimal valid semantic plan
+  program_id: prog-autviam-planning-alpha
+  authority: human-approved
+repositories:
+  - id: repo-skills
+    name: Skills_repo
+    authority: repository-supported
+milestones:
+  - id: ms-planning-alpha
+    title: Planning Alpha semantic core
+    authority: human-approved
+    program_id: prog-autviam-planning-alpha
+work_packages:
+  - id: wp-semantic-skeleton
+    title: Author AutViam profile semantic skeleton
+    authority: human-approved
+    milestone_id: ms-planning-alpha
+semantic_checkpoints:
+  - id: scp-schema-compiles
+    title: Profile package compiles through Whatter
+    authority: repository-supported
+    work_package_id: wp-semantic-skeleton
+  - id: scp-fixture-roundtrip
+    title: Semantic fixtures round-trip under schema
+    authority: repository-supported
+    work_package_id: wp-semantic-skeleton
+evidence_intents:
+  - id: ei-compiled-profile-hash
+    title: Record compiled profile package content hash
+    authority: profile-policy
+    semantic_checkpoint_id: scp-schema-compiles
+  - id: ei-fixture-report
+    title: Deterministic fixture pass/fail report
+    authority: profile-policy
+    semantic_checkpoint_id: scp-fixture-roundtrip
+requirements:
+  - id: req-no-semantic-phase
+    statement: Semantic plans must not contain Phase objects (A-002).
+    authority: verified
+    kind: invariant
+  - id: req-stable-ids
+    statement: Semantic objects use stable prefixed IDs with explicit authority.
+    authority: verified
+    kind: constraint
+decisions:
+  - id: dec-hierarchy-a002
+    statement: Use Program → Milestone → Work Package → scp → Evidence Intent.
+    authority: human-approved
+    status: accepted
+assets:
+  - id: asset-quantity-example
+    title: Example typed quantity for timeout budget documentation
+    authority: user-asserted
+    asset_authority: illustrative
+    timeout_example:
+      value: "3.0e+1"
+      unit: s
+      uncertainty: null
+context_requirements:
+  - id: ctx-profile-kernel-api
+    concept: Whatter minimum profile compiler contract
+    authority: repository-supported
+    necessity: required
+    inference: forbidden

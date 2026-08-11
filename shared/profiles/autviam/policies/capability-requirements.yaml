@@ -1,0 +1,45 @@
+# Subscription / local capability requirements (A2-3).
+# Capability requirements are profile policy, not semantic-plan facts.
+schema_version: autviam.capability-requirements/v1
+id: autviam.capability-requirements
+version: "1.0.0"
+
+mandatory_route:
+  description: >
+    AutViam must statically prove a complete mandatory planning route using
+    subscription OAuth or local models. API routes are optional candidates only.
+  authentication:
+    modes_allowed:
+      - subscription-oauth
+      - local-model
+    modes_forbidden_by_default:
+      - api-key
+    default: subscription-first
+  billing:
+    preferred_channel: subscription
+    api_requires_explicit_opt_in: true
+
+capabilities:
+  model.subscription:
+    kind: model
+    authentication_mode: subscription-oauth
+    credential_owner: adapter
+    description: Subscription OAuth model access (e.g. Pi-hosted).
+  model.local:
+    kind: model
+    authentication_mode: local-model
+    credential_owner: local-runtime
+    description: Local OpenAI-compatible or offline model.
+  filesystem.read:
+    kind: process
+    description: Read repository and plan artifacts.
+
+planning_alpha_pipeline:
+  pipeline_id: planning-alpha-skeleton
+  required_capabilities:
+    - model.subscription
+  alternative_capabilities:
+    - model.local
+  note: >
+    At least one of model.subscription or model.local must be available for
+    model-backed planning roles. Fixture verification needs only filesystem.read.

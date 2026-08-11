@@ -1,0 +1,18 @@
+# GenPlan alpha pipeline documentation (A2-4).
+# Runtime entry: tools/genplan or `whatter profile genplan`.
+schema_version: autviam.pipeline-doc/v1
+id: genplan-alpha
+steps:
+  - ingest: preserve exact source bytes + content hash + line index
+  - classify: deterministic Markdown/plain extraction with source spans
+  - gaps: open decisions for unclassified / missing structure
+  - normalize: stable JSON + normalized_hash + source_manifest_hash
+  - views: plan.md + plan.html matching object ids
+  - approve: external approval binds hashes (not embedded in plan.yaml)
+modes:
+  - request
+  - digest
+preservation_rule: >
+  No source-supported detail is silently invented or dropped. Inferred
+  skeleton structure is labelled authority=inferred and open decisions
+  remain explicit.

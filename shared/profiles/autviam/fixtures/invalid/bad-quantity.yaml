@@ -1,0 +1,26 @@
+# INVALID — normative quantity uses bare float and missing unit
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-bad-qty
+  title: Bad quantity
+  program_id: prog-x
+  authority: user-asserted
+milestones:
+  - id: ms-x
+    title: X
+    authority: user-asserted
+    program_id: prog-x
+work_packages:
+  - id: wp-x
+    title: X
+    authority: user-asserted
+    milestone_id: ms-x
+assets:
+  - id: asset-bad-qty
+    title: Bad quantity asset
+    authority: user-asserted
+    asset_authority: illustrative
+    timeout:
+      value: 1.5e-6
+      unit: null
+      uncertainty: null

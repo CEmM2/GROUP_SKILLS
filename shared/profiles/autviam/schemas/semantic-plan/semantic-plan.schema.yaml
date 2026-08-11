@@ -1,0 +1,157 @@
+# Minimal AutViam semantic-plan schema for Planning Alpha (A2-3).
+# Authority: design/05 A-002 (no semantic Phase), A-003 (scp/ecp IDs), A-005 (quantities).
+# This file is normative package content; execution policies must not appear as semantic facts.
+schema_version: autviam.semantic-plan-schema/v1
+id: autviam.semantic-plan
+version: "1.0.0"
+title: AutViam semantic plan (Planning Alpha minimum)
+
+document:
+  schema_version_const: autviam.semantic-plan/v1
+  required_top_level:
+    - schema_version
+    - plan
+  optional_top_level:
+    - repositories
+    - sources
+    - problem
+    - requirements
+    - decisions
+    - assets
+    - context_requirements
+    - preconditions
+    - failure_modes
+    - milestones
+    - work_packages
+    - semantic_checkpoints
+    - evidence_intents
+    - open_decisions
+    - extensions
+  # Forbidden: semantic Phase and optional execution policy embedded as fact.
+  forbidden_top_level:
+    - phases
+    - phase
+    - execution_phases
+    - execution_plan
+    - retry_budget
+    - routing
+    - gate_policy
+    - max_task_attempts
+    - scheduler
+    - recovery_profile
+
+semantic_hierarchy:
+  order:
+    - program
+    - milestone
+    - work_package
+    - semantic_checkpoint
+    - evidence_intent
+  notes:
+    - Phase is an execution-plan concept only (A-002); never a semantic object.
+    - PlanCompile may introduce execution phases without semantic amendment.
+
+id_prefixes:
+  program: prog-
+  plan: plan-
+  source: src-
+  fact: fact-
+  requirement: req-
+  decision: dec-
+  asset: asset-
+  context_requirement: ctx-
+  precondition: pre-
+  failure_mode: fm-
+  milestone: ms-
+  work_package: wp-
+  semantic_checkpoint: scp-
+  evidence_intent: ei-
+  acceptance_evidence: ae-
+  open_decision: od-
+  # Execution-only vocabulary (must not appear as semantic object kinds):
+  execution_checkpoint: ecp-
+
+object_kinds:
+  plan:
+    required_fields: [id, title, program_id]
+    id_prefix: plan-
+    authority: required
+  program:
+    # Inline on plan or referenced; plan.program_id is mandatory.
+    id_prefix: prog-
+  milestone:
+    required_fields: [id, title, authority]
+    id_prefix: ms-
+    references: [program_id]
+  work_package:
+    required_fields: [id, title, authority, milestone_id]
+    id_prefix: wp-
+    references: [milestone_id]
+  semantic_checkpoint:
+    required_fields: [id, title, authority, work_package_id]
+    id_prefix: scp-
+    references: [work_package_id]
+  evidence_intent:
+    required_fields: [id, title, authority, semantic_checkpoint_id]
+    id_prefix: ei-
+    references: [semantic_checkpoint_id]
+  requirement:
+    required_fields: [id, statement, authority, kind]
+    id_prefix: req-
+    kinds: [functional, invariant, constraint, assumption, completion]
+  decision:
+    required_fields: [id, statement, authority, status]
+    id_prefix: dec-
+    statuses: [proposed, accepted, rejected, deferred, superseded]
+  asset:
+    required_fields: [id, title, authority, asset_authority]
+    id_prefix: asset-
+    asset_authorities: [normative, reference, illustrative, legacy, experimental, generated]
+  context_requirement:
+    required_fields: [id, concept, authority, necessity, inference]
+    id_prefix: ctx-
+    necessity: [required, advisory]
+    inference: [forbidden, allowed, allowed-with-independent-check]
+
+authority:
+  # Explicit authority is required on every semantic object below the plan root.
+  classes:
+    - verified
+    - repository-supported
+    - user-asserted
+    - inferred
+    - uncertain
+    - contradicted
+    - profile-policy
+    - human-approved
+  default_order:
+    - verified
+    - repository-supported
+    - human-approved
+    - user-asserted
+    - inferred
+    - uncertain
+    - contradicted
+
+quantity:
+  # A-005 typed quantity object
+  object_keys: [value, unit, uncertainty]
+  value: exact_decimal_string
+  unit: mandatory_nonblank_string
+  uncertainty: null_or_exact_decimal_string
+  reject: [nan, infinity, bare_json_float_for_normative_quantity]
+
+forbidden_semantic_fields:
+  # Optional execution policy must not be stored as semantic fact.
+  - retry_budget
+  - max_attempts
+  - routing_scores
+  - gate_a
+  - gate_b
+  - gate_c
+  - execution_phase_id
+  - phase_id
+  - branch_strategy
+  - worktree_policy
+  - model_tier
+  - session_affinity

@@ -1,0 +1,21 @@
+# INVALID — optional execution policy embedded as semantic fact
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-exec-policy
+  title: Execution policy smuggled into semantic plan
+  program_id: prog-x
+  authority: user-asserted
+milestones:
+  - id: ms-x
+    title: X
+    authority: user-asserted
+    program_id: prog-x
+work_packages:
+  - id: wp-x
+    title: X
+    authority: user-asserted
+    milestone_id: ms-x
+    retry_budget: 3
+    max_attempts: 5
+    routing_scores:
+      complexity: 4

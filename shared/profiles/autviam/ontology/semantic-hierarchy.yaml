@@ -1,0 +1,64 @@
+# AutViam semantic ontology — Planning Alpha (A2-3)
+# Normative hierarchy: A-002 replaces D-005 (Phase is not semantic).
+schema_version: autviam.ontology/v1
+id: autviam.semantic-hierarchy
+version: "1.0.0"
+
+hierarchy:
+  - id: program
+    label: Program
+    prefix: prog-
+    parent: null
+    description: Complete initiative or feature delivery; may span repositories.
+  - id: milestone
+    label: Milestone
+    prefix: ms-
+    parent: program
+    description: Semantic review or release boundary (product/scientific meaning).
+  - id: work_package
+    label: Work Package
+    prefix: wp-
+    parent: milestone
+    description: Coherent candidate implementation assignment.
+  - id: semantic_checkpoint
+    label: Semantic Checkpoint
+    prefix: scp-
+    parent: work_package
+    description: Internal red-green-debug-commit-local-verification boundary with semantic meaning.
+  - id: evidence_intent
+    label: Evidence Intent
+    prefix: ei-
+    parent: semantic_checkpoint
+    description: Declared intent to produce immutable evidence for one or more claims.
+
+non_semantic:
+  - id: execution_phase
+    label: Execution Phase
+    note: Execution-plan only. PlanCompile may introduce/reorder phases without semantic amendment (A-002).
+  - id: execution_checkpoint
+    label: Execution Checkpoint
+    prefix: ecp-
+    note: Distinct from scp-*; always records semantic trace (A-003).
+
+supporting_kinds:
+  - id: requirement
+    prefix: req-
+  - id: decision
+    prefix: dec-
+  - id: asset
+    prefix: asset-
+  - id: context_requirement
+    prefix: ctx-
+  - id: source
+    prefix: src-
+  - id: fact
+    prefix: fact-
+  - id: open_decision
+    prefix: od-
+
+trace_rules:
+  - Every work_package references exactly one milestone_id.
+  - Every semantic_checkpoint references exactly one work_package_id.
+  - Every evidence_intent references exactly one semantic_checkpoint_id.
+  - Execution checkpoints (ecp-*) are out of scope for semantic-plan fixtures.
+  - No object of kind phase may appear in a semantic plan.

@@ -11,8 +11,8 @@
   "compatibility": {
     "legacy_available_until": "2026-10-01",
     "legacy_skills": {
-      "claude": "skills/shared/autviam_legacy/claude/LEGACY.md",
-      "codex": "skills/shared/autviam_legacy/codex/LEGACY.md"
+      "claude": "autviam_legacy/claude/LEGACY.md",
+      "codex": "autviam_legacy/codex/LEGACY.md"
     }
   },
   "commands": {

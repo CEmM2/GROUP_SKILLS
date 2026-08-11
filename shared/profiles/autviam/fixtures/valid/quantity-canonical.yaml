@@ -1,0 +1,43 @@
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-qty-canonical
+  title: Quantity canonicalization fixture
+  program_id: prog-qty
+  authority: verified
+milestones:
+  - id: ms-qty
+    title: Quantity milestone
+    authority: verified
+    program_id: prog-qty
+work_packages:
+  - id: wp-qty
+    title: Quantity work package
+    authority: verified
+    milestone_id: ms-qty
+semantic_checkpoints:
+  - id: scp-qty-check
+    title: Quantities are exact decimals
+    authority: verified
+    work_package_id: wp-qty
+evidence_intents:
+  - id: ei-qty-report
+    title: Quantity fixture report
+    authority: profile-policy
+    semantic_checkpoint_id: scp-qty-check
+assets:
+  - id: asset-timeout
+    title: Timeout quantity
+    authority: verified
+    asset_authority: reference
+    duration:
+      value: "1.0e-6"
+      unit: s
+      uncertainty: null
+  - id: asset-equivalent-timeout
+    title: Equivalent timeout spelling
+    authority: verified
+    asset_authority: reference
+    duration:
+      value: "0.000001"
+      unit: s
+      uncertainty: null

@@ -14,7 +14,7 @@ python <skills-root>/shared/scripts/autviam_facade.py \
   --facade codex --skill-root <skills-root>/AutViam_C --command <command> [arguments]
 ```
 
-The resolver validates the profile dependency and Whatter executable, emits the mapped Whatter command, and blocks rather than falling back. It does not invoke Whatter itself.
+The resolver validates the profile dependency and Whatter executable, emits a `whatter_invocation`, and blocks rather than falling back. It does not invoke Whatter itself. Execute the returned `argv` with the returned `env` merged into the process environment. The `WHATTER_AUTVIAM_PROFILE` binding is mandatory: do not reconstruct or execute a bare Whatter command from the table below.
 
 | Command | Whatter CLI |
 |---|---|

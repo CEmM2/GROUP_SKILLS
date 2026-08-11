@@ -1,0 +1,85 @@
+# AutViam profile skeleton (A2-3) — Planning Alpha minimum.
+# Compiles through the Whatter minimum profile compiler without kernel changes.
+# Semantic schema/ontology live as package files under schemas/ and ontology/;
+# they are intentionally NOT populated in this YAML (minimum compiler rejects
+# those sections when non-empty — see whatter.kernel.profile).
+schema_version: whatter.profile-source/v1
+profile:
+  id: autviam
+  version: 0.1.0
+parameters:
+  planning_alpha_version:
+    value: "1"
+    unit: "1"
+    uncertainty: null
+  # Non-quantity string parameters (not value/unit/uncertainty triples).
+  semantic_hierarchy: program-milestone-work-package-scp-evidence-intent
+  no_semantic_phase: "true"
+roles:
+  planner:
+    description: Authors and revises the approved semantic plan under subscription or local model capability.
+    capabilities:
+      - model.subscription
+      - model.local
+      - filesystem.read
+  semantic-reviewer:
+    description: Reviews semantic plan coherence without execution-policy authority.
+    capabilities:
+      - model.subscription
+      - model.local
+      - filesystem.read
+  plan-approver:
+    description: Human authority for semantic-plan approval (external approval object).
+    capabilities: []
+  fixture-verifier:
+    description: Deterministic verifier for semantic fixtures and ID/quantity rules.
+    capabilities:
+      - filesystem.read
+actions:
+  compile-skeleton:
+    kind: kernel
+    role: fixture-verifier
+    permissions:
+      - filesystem.read
+    default_unit_type: probe
+    kernel_handler: kernel.builtin
+  verify-semantic-fixtures:
+    kind: kernel
+    role: fixture-verifier
+    permissions:
+      - filesystem.read
+    default_unit_type: verification
+    kernel_handler: kernel.builtin
+pipelines:
+  planning-alpha-skeleton:
+    entry: compile-skeleton
+    units:
+      compile-skeleton:
+        role: fixture-verifier
+        action: compile-skeleton
+        unit_type: probe
+        required_capabilities:
+          - model.subscription
+      verify-semantic-fixtures:
+        role: fixture-verifier
+        action: verify-semantic-fixtures
+        unit_type: verification
+    edges:
+      - source: compile-skeleton
+        target: verify-semantic-fixtures
+        kind: required
+    completion:
+      kind: all_units_succeeded
+extensions:
+  sosovski.autviam.planning-alpha:
+    package_layout: profiles/autviam
+    semantic_schema: schemas/semantic-plan/semantic-plan.schema.yaml
+    ontology: ontology/semantic-hierarchy.yaml
+    scp_ecp_vocabulary: ontology/checkpoint-vocabulary.yaml
+    hierarchy: Program-Milestone-WorkPackage-SemanticCheckpoint-EvidenceIntent
+    no_semantic_phase: true
+    capability_policy: policies/capability-requirements.yaml
+    planning_roles: roles/planning-roles.yaml
+    genplan_tools: tools/genplan
+    genplan_cli: "python -m genplan (PYTHONPATH=profiles/autviam/tools)"
+    genplan_whatter: "whatter profile genplan"

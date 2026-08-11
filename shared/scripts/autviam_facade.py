@@ -9,6 +9,7 @@ after the user has supplied the normal Whatter inputs and authorization.
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
 import json
 import shutil
@@ -19,8 +20,8 @@ from typing import Any
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
 SHARED_ROOT = SCRIPT_ROOT.parent
-REPO_ROOT = SHARED_ROOT.parents[1]
 METADATA_PATH = SHARED_ROOT / "autviam-profile-dependency.json"
+PROFILE_ENV_VAR = "WHATTER_AUTVIAM_PROFILE"
 
 
 class BootstrapError(ValueError):
@@ -31,16 +32,24 @@ def load_metadata() -> dict[str, Any]:
     try:
         document = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise BootstrapError(f"AutViam profile dependency metadata is unavailable: {METADATA_PATH}") from exc
+        raise BootstrapError(
+            f"AutViam profile dependency metadata is unavailable: {METADATA_PATH}"
+        ) from exc
     if document.get("schema_version") != "autviam.profile-dependency/v1":
-        raise BootstrapError("AutViam profile dependency metadata has an unsupported schema version.")
+        raise BootstrapError(
+            "AutViam profile dependency metadata has an unsupported schema version."
+        )
     return document
 
 
 def tree_hash(path: Path) -> str:
     digest = hashlib.sha256()
     for item in sorted(path.rglob("*")):
-        if not item.is_file() or "__pycache__" in item.parts or item.name == ".DS_Store":
+        if (
+            not item.is_file()
+            or "__pycache__" in item.parts
+            or item.name == ".DS_Store"
+        ):
             continue
         digest.update(item.relative_to(path).as_posix().encode("utf-8"))
         digest.update(b"\0")
@@ -50,12 +59,18 @@ def tree_hash(path: Path) -> str:
 
 
 def resolve_profile(metadata: dict[str, Any], override: str | None) -> dict[str, str]:
-    profile = Path(override).resolve() if override else REPO_ROOT / metadata["profile"]["source_path"]
+    profile = (
+        Path(override).resolve()
+        if override
+        else SHARED_ROOT / metadata["profile"]["source_path"]
+    )
     if not profile.is_dir():
         raise BootstrapError(f"AutViam profile dependency is missing: {profile}")
     for required in metadata["profile"]["required_files"]:
         if not (profile / required).is_file():
-            raise BootstrapError(f"AutViam profile dependency is incomplete: {profile / required}")
+            raise BootstrapError(
+                f"AutViam profile dependency is incomplete: {profile / required}"
+            )
     return {
         "id": metadata["profile"]["id"],
         "path": str(profile),
@@ -76,10 +91,27 @@ def require_whatter(command: str) -> str:
     return command
 
 
-def explicit_legacy(metadata: dict[str, Any], facade: str, arguments: list[str]) -> dict[str, Any]:
+def explicit_legacy(
+    metadata: dict[str, Any],
+    facade: str,
+    arguments: list[str],
+    *,
+    today: date | None = None,
+) -> dict[str, Any]:
     if not arguments:
         raise BootstrapError("`legacy` requires the old command to invoke explicitly.")
-    legacy = REPO_ROOT / metadata["compatibility"]["legacy_skills"][facade]
+    available_until = metadata["compatibility"]["legacy_available_until"]
+    try:
+        expires_on = date.fromisoformat(available_until)
+    except (TypeError, ValueError) as exc:
+        raise BootstrapError(
+            "AutViam legacy compatibility metadata has an invalid end date."
+        ) from exc
+    if (today or date.today()) > expires_on:
+        raise BootstrapError(
+            f"AutViam legacy compatibility window ended on {available_until}; migrate to the profile-backed workflow."
+        )
+    legacy = SHARED_ROOT / metadata["compatibility"]["legacy_skills"][facade]
     if not legacy.is_file():
         raise BootstrapError(f"Explicit legacy invocation is unavailable: {legacy}")
     return {
@@ -87,17 +119,25 @@ def explicit_legacy(metadata: dict[str, Any], facade: str, arguments: list[str])
         "facade": facade,
         "legacy_command": arguments[0],
         "legacy_skill": str(legacy),
-        "available_until": metadata["compatibility"]["legacy_available_until"],
+        "available_until": available_until,
     }
 
 
 def bootstrap(
-    *, facade: str, skill_root: str, command: str, arguments: list[str], whatter: str | None, profile_dir: str | None
+    *,
+    facade: str,
+    skill_root: str,
+    command: str,
+    arguments: list[str],
+    whatter: str | None,
+    profile_dir: str | None,
 ) -> dict[str, Any]:
     metadata = load_metadata()
     expected_skill = "AutViam" if facade == "claude" else "AutViam_C"
     if Path(skill_root).name != expected_skill:
-        raise BootstrapError(f"{facade} façade must use the {expected_skill} skill root.")
+        raise BootstrapError(
+            f"{facade} façade must use the {expected_skill} skill root."
+        )
     if command == "legacy":
         return explicit_legacy(metadata, facade, arguments)
     if command in metadata["obsolete_commands"]:
@@ -111,14 +151,19 @@ def bootstrap(
         )
     if command not in metadata["commands"]:
         supported = ", ".join(metadata["commands"])
-        raise BootstrapError(f"Unsupported AutViam façade command `{command}`. Supported commands: {supported}.")
+        raise BootstrapError(
+            f"Unsupported AutViam façade command `{command}`. Supported commands: {supported}."
+        )
     profile = resolve_profile(metadata, profile_dir)
     executable = require_whatter(whatter or metadata["whatter"]["executable"])
     return {
         "mode": "whatter-command",
         "facade": facade,
         "profile": profile,
-        "whatter_argv": [executable, *metadata["commands"][command], *arguments],
+        "whatter_invocation": {
+            "argv": [executable, *metadata["commands"][command], *arguments],
+            "env": {PROFILE_ENV_VAR: profile["path"]},
+        },
     }
 
 

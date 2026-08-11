@@ -1,0 +1,1 @@
+Add a profile-backed GenPlan command that digests rough Markdown into semantic YAML with source spans and approval hashes.

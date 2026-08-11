@@ -1,0 +1,39 @@
+# scp / ecp trace vocabulary (A-003)
+schema_version: autviam.checkpoint-vocabulary/v1
+id: autviam.checkpoint-vocabulary
+version: "1.0.0"
+
+semantic_checkpoint:
+  id_pattern: "^scp-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+  prefix: scp-
+  lives_in: semantic-plan
+  fields:
+    - id
+    - title
+    - authority
+    - work_package_id
+    - claims  # optional list of claim IDs
+    - verification_intent  # optional free text / structured intent
+
+execution_checkpoint:
+  id_pattern: "^ecp-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+  prefix: ecp-
+  lives_in: execution-plan
+  fields:
+    - id
+    - traces_to  # list of semantic object IDs (scp-*, wp-*, req-*, …)
+    - disposition  # one-to-one | split | merge | omit-advisory
+  note: >
+    PlanCompile may map one-to-one, split, merge, or omit advisory semantic
+    checkpoints with an explicit trace disposition. A2-3 records vocabulary only.
+
+trace_dispositions:
+  - one-to-one
+  - split
+  - merge
+  - omit-advisory
+
+stable_id_rules:
+  - Source line ranges are evidence locators, not identities.
+  - Semantic IDs are stable across PlanCompile; ecp IDs are compile-time.
+  - Renaming a semantic ID requires an explicit supersession decision.

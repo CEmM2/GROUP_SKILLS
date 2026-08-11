@@ -1,0 +1,13 @@
+# Documentation mirror of the pipeline declared in profile.yaml.
+# The Whatter compiler reads profile.yaml only; this file is human/trace aid.
+schema_version: autviam.pipeline-doc/v1
+id: planning-alpha-skeleton
+entry: compile-skeleton
+units:
+  - id: compile-skeleton
+    action: compile-skeleton
+  - id: verify-semantic-fixtures
+    action: verify-semantic-fixtures
+edges:
+  - compile-skeleton -> verify-semantic-fixtures
+note: Execution phases are not declared here; PlanCompile owns execution structure.

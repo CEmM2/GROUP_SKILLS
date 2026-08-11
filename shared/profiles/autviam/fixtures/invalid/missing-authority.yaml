@@ -1,0 +1,16 @@
+# INVALID — work package lacks explicit authority
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-no-auth
+  title: Missing authority on work package
+  program_id: prog-x
+  authority: user-asserted
+milestones:
+  - id: ms-x
+    title: X
+    authority: user-asserted
+    program_id: prog-x
+work_packages:
+  - id: wp-no-auth
+    title: Missing authority field
+    milestone_id: ms-x

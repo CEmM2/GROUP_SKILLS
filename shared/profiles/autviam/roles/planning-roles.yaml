@@ -1,0 +1,36 @@
+# Minimal planning roles for AutViam Planning Alpha (A2-3).
+# Mirrored into profile.yaml roles for Whatter compilation.
+schema_version: autviam.planning-roles/v1
+id: autviam.planning-roles
+version: "1.0.0"
+
+roles:
+  planner:
+    profile_role: planner
+    mission: Draft and revise semantic plans.
+    capabilities_required:
+      - model.subscription
+      - model.local
+    may_mutate_semantic_plan: true
+    may_approve: false
+  semantic-reviewer:
+    profile_role: semantic-reviewer
+    mission: Challenge coherence, authority, and missing evidence intents.
+    capabilities_required:
+      - model.subscription
+      - model.local
+    may_mutate_semantic_plan: false
+    may_approve: false
+  plan-approver:
+    profile_role: plan-approver
+    mission: External human approval of the semantic plan.
+    capabilities_required: []
+    may_mutate_semantic_plan: false
+    may_approve: true
+  fixture-verifier:
+    profile_role: fixture-verifier
+    mission: Deterministic fixture and quantity verification (no model required).
+    capabilities_required:
+      - filesystem.read
+    may_mutate_semantic_plan: false
+    may_approve: false

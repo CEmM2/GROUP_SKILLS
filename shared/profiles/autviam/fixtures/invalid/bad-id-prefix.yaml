@@ -1,0 +1,22 @@
+# INVALID — checkpoint uses legacy cp- prefix instead of scp-
+schema_version: autviam.semantic-plan/v1
+plan:
+  id: plan-bad-prefix
+  title: Bad checkpoint prefix
+  program_id: prog-x
+  authority: user-asserted
+milestones:
+  - id: ms-x
+    title: X
+    authority: user-asserted
+    program_id: prog-x
+work_packages:
+  - id: wp-x
+    title: X
+    authority: user-asserted
+    milestone_id: ms-x
+semantic_checkpoints:
+  - id: cp-legacy
+    title: Wrong prefix
+    authority: user-asserted
+    work_package_id: wp-x
