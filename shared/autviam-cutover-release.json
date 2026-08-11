@@ -1,0 +1,25 @@
+{
+  "schema_version": "autviam.cutover-release/v1",
+  "release_id": "autviam-v1-cutover-2026-08-11",
+  "effective_on": "2026-08-11",
+  "selection": {
+    "default_for_new_projects": "profile-backed",
+    "automatic_fallback": false
+  },
+  "legacy": {
+    "mode": "explicit-only",
+    "freeze_policy": "compatibility-and-security-fixes-only",
+    "available_until": "2026-10-01",
+    "preserve_plans_runs_and_readers": true
+  },
+  "delivery": {
+    "default_terminal": "delivery.ready",
+    "merge_behavior": "separate-governed-action"
+  },
+  "rollback": {
+    "previous_default": "legacy",
+    "strategy": "forward-commit-release-pointer",
+    "history_rewrite": false,
+    "full_reverification_required": true
+  }
+}

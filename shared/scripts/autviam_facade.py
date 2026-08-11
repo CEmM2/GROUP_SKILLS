@@ -21,6 +21,7 @@ from typing import Any
 SCRIPT_ROOT = Path(__file__).resolve().parent
 SHARED_ROOT = SCRIPT_ROOT.parent
 METADATA_PATH = SHARED_ROOT / "autviam-profile-dependency.json"
+CUTOVER_PATH = SHARED_ROOT / "autviam-cutover-release.json"
 PROFILE_ENV_VAR = "WHATTER_AUTVIAM_PROFILE"
 
 
@@ -40,6 +41,54 @@ def load_metadata() -> dict[str, Any]:
             "AutViam profile dependency metadata has an unsupported schema version."
         )
     return document
+
+
+def load_cutover(metadata: dict[str, Any]) -> dict[str, Any]:
+    try:
+        document = json.loads(CUTOVER_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BootstrapError(
+            f"AutViam cutover release metadata is unavailable: {CUTOVER_PATH}"
+        ) from exc
+    if document.get("schema_version") != "autviam.cutover-release/v1":
+        raise BootstrapError(
+            "AutViam cutover metadata has an unsupported schema version."
+        )
+    selected = document.get("selection", {}).get("default_for_new_projects")
+    if selected not in {"profile-backed", "legacy"}:
+        raise BootstrapError(
+            "AutViam cutover metadata has an invalid default selection."
+        )
+    if document.get("selection", {}).get("automatic_fallback") is not False:
+        raise BootstrapError(
+            "AutViam cutover metadata must disable automatic fallback."
+        )
+    if (
+        document.get("legacy", {}).get("available_until")
+        != metadata["compatibility"]["legacy_available_until"]
+    ):
+        raise BootstrapError("AutViam cutover and compatibility windows disagree.")
+    if (
+        document.get("legacy", {}).get("freeze_policy")
+        != "compatibility-and-security-fixes-only"
+    ):
+        raise BootstrapError("AutViam legacy freeze policy is invalid.")
+    if document.get("delivery") != {
+        "default_terminal": "delivery.ready",
+        "merge_behavior": "separate-governed-action",
+    }:
+        raise BootstrapError("AutViam cutover delivery policy is invalid.")
+    return document
+
+
+def cutover_summary(cutover: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "release_id": cutover["release_id"],
+        "default_for_new_projects": cutover["selection"]["default_for_new_projects"],
+        "automatic_fallback": cutover["selection"]["automatic_fallback"],
+        "default_terminal": cutover["delivery"]["default_terminal"],
+        "merge_behavior": cutover["delivery"]["merge_behavior"],
+    }
 
 
 def tree_hash(path: Path) -> str:
@@ -97,7 +146,9 @@ def explicit_legacy(
     arguments: list[str],
     *,
     today: date | None = None,
+    cutover: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    cutover = cutover or load_cutover(metadata)
     if not arguments:
         raise BootstrapError("`legacy` requires the old command to invoke explicitly.")
     available_until = metadata["compatibility"]["legacy_available_until"]
@@ -120,6 +171,8 @@ def explicit_legacy(
         "legacy_command": arguments[0],
         "legacy_skill": str(legacy),
         "available_until": available_until,
+        "legacy_freeze": cutover["legacy"]["freeze_policy"],
+        "cutover": cutover_summary(cutover),
     }
 
 
@@ -133,13 +186,20 @@ def bootstrap(
     profile_dir: str | None,
 ) -> dict[str, Any]:
     metadata = load_metadata()
+    cutover = load_cutover(metadata)
     expected_skill = "AutViam" if facade == "claude" else "AutViam_C"
     if Path(skill_root).name != expected_skill:
         raise BootstrapError(
             f"{facade} façade must use the {expected_skill} skill root."
         )
     if command == "legacy":
-        return explicit_legacy(metadata, facade, arguments)
+        return explicit_legacy(metadata, facade, arguments, cutover=cutover)
+    if cutover["selection"]["default_for_new_projects"] == "legacy":
+        legacy = explicit_legacy(
+            metadata, facade, [command, *arguments], cutover=cutover
+        )
+        legacy["mode"] = "rollback-legacy-default"
+        return legacy
     if command in metadata["obsolete_commands"]:
         raise BootstrapError(
             f"`{command}` has obsolete scheduler/gate semantics. Explicitly invoke `legacy {command}` through the compatibility window, or migrate to `run`, `review`, `close`, and `delivery`."
@@ -159,6 +219,7 @@ def bootstrap(
     return {
         "mode": "whatter-command",
         "facade": facade,
+        "cutover": cutover_summary(cutover),
         "profile": profile,
         "whatter_invocation": {
             "argv": [executable, *metadata["commands"][command], *arguments],

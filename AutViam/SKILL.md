@@ -16,6 +16,11 @@ python <skills-root>/shared/scripts/autviam_facade.py \
 
 It blocks clearly when Whatter or the profile is missing and only emits a `whatter_invocation`; it never executes one or selects a fallback. Execute the returned `argv` with the returned `env` merged into the process environment. The `WHATTER_AUTVIAM_PROFILE` binding is mandatory: do not reconstruct or execute a bare Whatter command from the table below.
 
+The published `shared/autviam-cutover-release.json` makes the profile-backed path the default for
+new projects and reports that release state in every result. The default successful terminal remains
+`delivery.ready`; merge is a separate governed action. Migration and rollback instructions are in
+`shared/autviam-migration-rollback.md`.
+
 | Command | Whatter CLI |
 |---|---|
 | `gen-plan` | `whatter profile genplan` |
@@ -23,4 +28,4 @@ It blocks clearly when Whatter or the profile is missing and only emits a `whatt
 | `status` | `whatter runtime status` |
 | `run`, `review`, `close`, `delivery` | Block with migration guidance until Whatter exposes those production CLI surfaces. |
 
-Old `tasks`, `scaffold`, `exec`, `phase`, fixed-gate, and tracker semantics are obsolete. During the compatibility window ending 2026-10-01, use `legacy <old-command>` explicitly; the façade never routes an old command to legacy automatically.
+Old `tasks`, `scaffold`, `exec`, `phase`, fixed-gate, and tracker semantics are frozen to compatibility and security fixes. During the compatibility window ending 2026-10-01, use `legacy <old-command>` explicitly; the façade never routes an old command to legacy automatically. Only a separately committed rollback release pointer may restore the visible `rollback-legacy-default` mode.

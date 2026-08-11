@@ -1,0 +1,135 @@
+{
+  "schema_version": "autviam.cleanup-candidates/v1",
+  "operation": "inventory-only",
+  "delete_authorized": false,
+  "compatibility_window_ends": "2026-10-01",
+  "active_path_audit": {
+    "active_entrypoints": [
+      "skills/AutViam/SKILL.md",
+      "skills/AutViam_C/SKILL.md",
+      "skills/shared/scripts/autviam_facade.py",
+      "skills/shared/profiles/autviam/profile.yaml"
+    ],
+    "candidate_prefix": "skills/shared/autviam_legacy/",
+    "unused_by_profile_backed_default": true,
+    "legacy_compatibility_reachable": true,
+    "result": "candidate-only-after-window"
+  },
+  "required_before_removal": [
+    "compatibility window has ended",
+    "retained lifecycle and bootstrap artifact-reference audits pass",
+    "explicit legacy invocations have been retired by a separately approved change"
+  ],
+  "candidates": [
+    {
+      "id": "legacy-duplicate-draft-pr",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "17bdc7412edd38deb126d639e5d25440bee63e2e867219d9cd558cebee5865dd",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/draft_pr.sh",
+        "skills/shared/autviam_legacy/codex/scripts/draft_pr.sh",
+        "skills/shared/autviam_legacy/shared_scripts/draft_pr.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-gate-state",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "3e73d08b1392f14292b40e518566842c9995a05f0d5bba94d05f23771d347b94",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/gate_state.py",
+        "skills/shared/autviam_legacy/codex/scripts/gate_state.py",
+        "skills/shared/autviam_legacy/shared_scripts/gate_state.py"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-init-plan",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "749caf09fd92ee66e500b7e22f64f96f15a3ca209ffdfaf7aa398f4f5ec2125b",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/init_plan.sh",
+        "skills/shared/autviam_legacy/codex/scripts/init_plan.sh",
+        "skills/shared/autviam_legacy/shared_scripts/init_plan.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-issue-body",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "60af1abf95ea9ca0be867620eb340cb6db03389d8b172f49b251bd70c270adff",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/issue_body.sh",
+        "skills/shared/autviam_legacy/codex/scripts/issue_body.sh",
+        "skills/shared/autviam_legacy/shared_scripts/issue_body.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-match-specialists",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "60b214365435f440d052c27716d94995193cb07933420d7c23460f0d1e3329b1",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/match_specialists.sh",
+        "skills/shared/autviam_legacy/codex/scripts/match_specialists.sh",
+        "skills/shared/autviam_legacy/shared_scripts/match_specialists.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-phase-close",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "e3db409b064e85d1d313c40b1c7131bd1532bade2d663b103766249804ea1266",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/phase-close.sh",
+        "skills/shared/autviam_legacy/codex/scripts/phase-close.sh",
+        "skills/shared/autviam_legacy/shared_scripts/phase-close.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-phase-git",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "4a39523fbf13068e97fd1cc3c1d02593d9ba2d31c49de28fcc09024c892d1424",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/phase_git.sh",
+        "skills/shared/autviam_legacy/codex/scripts/phase_git.sh",
+        "skills/shared/autviam_legacy/shared_scripts/phase_git.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-project-sync",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "23a13f2d8bcc4938ee277f00b06e1a5b9bb07ad327b6f311e3dd566fca741d65",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/project_sync.sh",
+        "skills/shared/autviam_legacy/codex/scripts/project_sync.sh",
+        "skills/shared/autviam_legacy/shared_scripts/project_sync.sh"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-routing-core",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "837f9f979b000809b4a8186b903556a3736e562a8fe7bb652ddb516f95301f56",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/routing_core.py",
+        "skills/shared/autviam_legacy/codex/scripts/routing_core.py",
+        "skills/shared/autviam_legacy/shared_scripts/routing_core.py"
+      ]
+    },
+    {
+      "id": "legacy-duplicate-update-tracker",
+      "disposition": "retain",
+      "eligible_after": "2026-10-02",
+      "sha256": "66a46f19521fc274a63160b55d459187101aa911a8a0ff2fb2fa162257b1bdfa",
+      "paths": [
+        "skills/shared/autviam_legacy/claude/scripts/update_tracker.sh",
+        "skills/shared/autviam_legacy/codex/scripts/update_tracker.sh",
+        "skills/shared/autviam_legacy/shared_scripts/update_tracker.sh"
+      ]
+    }
+  ]
+}
