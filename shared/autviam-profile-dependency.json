@@ -1,0 +1,46 @@
+{
+  "schema_version": "autviam.profile-dependency/v1",
+  "profile": {
+    "id": "autviam",
+    "source_path": "profiles/autviam",
+    "required_files": ["profile.yaml"]
+  },
+  "whatter": {
+    "executable": "whatter"
+  },
+  "compatibility": {
+    "legacy_available_until": "2026-10-01",
+    "legacy_skills": {
+      "claude": "skills/shared/autviam_legacy/claude/LEGACY.md",
+      "codex": "skills/shared/autviam_legacy/codex/LEGACY.md"
+    }
+  },
+  "commands": {
+    "gen-plan": ["profile", "genplan"],
+    "plan-compile": ["plan", "compile"],
+    "status": ["runtime", "status"]
+  },
+  "unavailable_commands": {
+    "run": "Whatter does not yet expose a production generic execution-plan runtime CLI.",
+    "review": "Whatter does not yet expose a review CLI command.",
+    "close": "Whatter does not yet expose a close CLI command.",
+    "delivery": "Whatter does not yet expose a delivery CLI command."
+  },
+  "obsolete_commands": [
+    "tasks",
+    "scaffold",
+    "exec",
+    "phase",
+    "close-phase",
+    "close-plan",
+    "task",
+    "e2e",
+    "fact-check",
+    "plan-review",
+    "diff-review",
+    "arch",
+    "architecture",
+    "explain",
+    "install"
+  ]
+}
