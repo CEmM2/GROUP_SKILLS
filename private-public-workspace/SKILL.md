@@ -90,7 +90,9 @@ To work through pull requests into `dev`, the public repository needs:
   repository requires more today, **Stop** and ask;
 - the publishing kit's `scripts/harden_repo.sh OWNER/NAME [--env ...]` if the
   owner uses it (tag rules, immutable releases, read-only workflow tokens,
-  gated PyPI environments);
+  gated PyPI environments). It turns on "delete branch on merge", so `dev`
+  must be protected at least against deletion: otherwise merging `dev` into
+  the default branch deletes it, and the submodule tracks `dev`;
 - CI that runs for `dev`. If the workflows name only the default branch, push
   a branch adding `dev` to the triggers and hand the owner the pull request.
   Require the checks on `dev` only after that is merged.
@@ -149,8 +151,10 @@ move broke; `references/repairs.md` has each case with its fix:
 
 - Write the record from `templates/record.md` where the repository's own
   document rules allow it, and commit.
-- Push the branch to the private default branch (it is a fast-forward), then
-  move the owner's checkout onto it: `git switch BRANCH`, `git merge --ff-only`,
+- Push the branch to the private default branch (it is a fast-forward). If the
+  private repository only accepts pull requests there, open one and
+  rebase-merge it, so the commits stay as they are. Then move the owner's
+  checkout onto it: `git switch BRANCH`, `git merge --ff-only`,
   `git submodule update --init`, `git -C public switch dev`. Remove the worktree.
 - Make sure the publishing kit's entry for this repository is disabled: a
   publication from the new layout would push an almost empty tree.
