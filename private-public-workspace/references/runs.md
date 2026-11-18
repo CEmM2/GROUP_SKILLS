@@ -45,3 +45,15 @@ months behind and the private repository was the only place where work
 happened, with vendored subtrees being removed. Moving it would have meant
 classifying thousands of files about to be deleted. The layout needs the other
 side to be where code changes are made first.
+
+## mechdsl-workbench (2026-11-18)
+
+- All 57 tracked files were public (55 identical, 2 rewritten by the kit); the
+  private `main` matched public `main` exactly. The private content was four
+  ignored files and folders (`CLAUDE.md`, `TEST_REPORT.md`, a patch,
+  `.comment-review/`), which the owner chose to track. No private tests, so no
+  test repairs: 55 passed before and after.
+- An uncommitted pin bump in public files became a public branch into `dev`.
+- The contract suite (`-m contract`, manual workflow only) fails on every
+  MechDSL pin tried (v0.2.0, v0.2.1, v0.2.2): a bundled example uses `tet4`,
+  outside MechDSL's MVP-stable element subset. Found, not caused, by the move.

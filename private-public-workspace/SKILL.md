@@ -69,6 +69,10 @@ Read the report:
 - Files in both repositories that each repository needs its own copy of
   (`.gitignore`, `.gitattributes`): keep them.
 
+The private material may be untracked and ignored (agent instructions, test
+reports): every tracked file can turn out to be public. Ask which ignored files
+the private repository should start tracking.
+
 Also list work that exists only on this computer: branches without an upstream
 (`git branch -vv`), uncommitted changes, stashes, worktrees, spare public
 clones. **Stop** and ask the owner whether to push, commit or drop each.
@@ -158,6 +162,13 @@ move broke; `references/repairs.md` has each case with its fix:
   `git submodule update --init`, `git -C public switch dev`. Remove the worktree.
 - Make sure the publishing kit's entry for this repository is disabled: a
   publication from the new layout would push an almost empty tree.
+- Move the checkout to `~/Github/Published/<name>` (repositories with a public
+  side live there). Leave a symlink at the old path while other sessions or
+  tools still use it, move the Claude project memory
+  (`~/.claude/projects/<path-key>/memory`) to the new path's key, and update
+  what points at the old path: Codex trusted projects and hook state, app
+  configuration, editable `uv tool` installs (reinstall from `public/`), the
+  private repository's own hook files.
 
 ### 8. Afterwards (with the owner)
 
